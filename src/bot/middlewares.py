@@ -1,0 +1,142 @@
+"""Middleware for access control."""
+import logging
+from typing import Callable, Dict, Any, Awaitable, Optional
+
+from aiogram import BaseMiddleware
+from aiogram.types import Message, CallbackQuery
+
+from bot.config import config
+
+logger = logging.getLogger(__name__)
+
+
+class AccessCheckMiddleware(BaseMiddleware):
+    """Middleware to check if user/chat is authorized to use the bot."""
+
+    async def __call__(
+        self,
+        handler: Callable[[Message | CallbackQuery, Dict[str, Any]], Awaitable[Any]],
+        event: Message | CallbackQuery,
+        data: Dict[str, Any]
+    ) -> Any:
+        """Check access and call handler if authorized."""
+        # Get chat info based on event type
+        if isinstance(event, Message):
+            chat = event.chat
+            user_id = event.from_user.id if event.from_user else None
+        elif isinstance(event, CallbackQuery):
+            chat = event.message.chat if event.message else None
+            user_id = event.from_user.id
+        else:
+            # Unknown event type, deny
+            return None
+
+        if not chat or not user_id:
+            return None
+
+        chat_type = chat.type
+        thread_id = _extractThreadId(event)
+        event_type = type(event).__name__
+
+        # Log every incoming interaction
+        logger.info(
+            "event=%s user_id=%d chat_id=%d chat_type=%s topic_id=%s",
+            event_type,
+            user_id,
+            chat.id,
+            chat_type,
+            thread_id,
+        )
+
+        # Check for group/supergroup chats
+        if chat_type in ['group', 'supergroup']:
+            if chat.id != config.GROUP_ID:
+                logger.warning(
+                    "Rejected: unauthorized group chat_id=%d user_id=%d",
+                    chat.id,
+                    user_id,
+                )
+                if isinstance(event, Message):
+                    await event.answer(
+                        "❌ Бот работает только в авторизованной группе."
+                    )
+                return None
+
+            # Check topic restriction for supergroups
+            if not self._isAllowedTopic(event, chat_type):
+                logger.info(
+                    "Rejected: topic not allowed user_id=%d topic_id=%s",
+                    user_id,
+                    thread_id,
+                )
+                return None
+
+            # Authorized group - proceed
+            return await handler(event, data)
+        
+        # Check for private chats (only admins allowed)
+        elif chat_type == 'private':
+            if user_id not in config.ADMIN_IDS:
+                logger.warning(
+                    "Rejected: non-admin private chat user_id=%d",
+                    user_id,
+                )
+                if isinstance(event, Message):
+                    await event.answer(
+                        "❌ Личные сообщения доступны только администраторам."
+                    )
+                return None
+            # Authorized admin - proceed
+            data['is_admin'] = True
+            return await handler(event, data)
+        
+        # Unknown chat type
+        logger.warning(
+            "Rejected: unknown chat_type=%s chat_id=%d user_id=%d",
+            chat_type,
+            chat.id,
+            user_id,
+        )
+        return None
+
+    @staticmethod
+    def _isAllowedTopic(
+        event: Message | CallbackQuery,
+        chat_type: str
+    ) -> bool:
+        """Check if the event comes from an allowed topic.
+
+        Rules:
+        - No TOPIC_IDS configured → no restriction.
+        - Chat is a regular group (not supergroup) → no restriction.
+        - Supergroup without forum topics → no restriction.
+        - Supergroup with forum topics → allow only configured topic IDs.
+        """
+        if not config.TOPIC_IDS:
+            return True
+
+        if chat_type != "supergroup":
+            return True
+
+        thread_id = _extractThreadId(event)
+        if thread_id is None:
+            # Supergroup without forum topics enabled — no restriction
+            return True
+
+        is_allowed = thread_id in config.TOPIC_IDS
+        if not is_allowed:
+            logger.debug(
+                "Blocked event in topic %d (allowed: %s)",
+                thread_id,
+                config.TOPIC_IDS,
+            )
+        return is_allowed
+
+
+def _extractThreadId(event: Message | CallbackQuery) -> Optional[int]:
+    """Extract message_thread_id from a Message or CallbackQuery."""
+    if isinstance(event, Message):
+        return event.message_thread_id
+    if isinstance(event, CallbackQuery) and event.message:
+        return event.message.message_thread_id  # type: ignore[union-attr]
+    return None
