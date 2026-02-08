@@ -81,11 +81,6 @@ async def handle_cancel(message: Message, state: FSMContext) -> None:
         except Exception as exc:
             logger.debug("Failed to delete bot prompt message %s: %s", bot_message_id, exc)
 
-    await message.answer(
-        "↩️ Действие отменено.",
-        reply_markup=get_main_menu_keyboard()
-    )
-
 
 @router.message(F.text == BTN_NEW_SESSION)
 async def create_new_session(message: Message, state: FSMContext) -> None:
