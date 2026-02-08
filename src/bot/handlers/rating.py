@@ -28,6 +28,7 @@ from bot.database.repositories import (
     get_group_by_telegram_id,
     get_active_session,
     get_or_create_user,
+    recalc_club_rating,
 )
 from bot.formatters import format_year_suffix, format_user_display_name
 from bot.keyboards import get_rating_keyboard, BTN_RATE, BTN_COMPLETE_SESSION
@@ -165,6 +166,10 @@ async def _save_or_update_rating(
         action = "сохранена"
 
     await db.commit()
+
+    # Update the stored club_rating average
+    await recalc_club_rating(db, movie_id)
+
     return action
 
 

@@ -78,7 +78,7 @@ async def _query_winner_movies(
 
     total_pages = math.ceil(total_movies / MOVIES_PER_PAGE)
 
-    query = query.order_by(func.avg(Rating.rating).desc().nullslast())
+    query = query.order_by(Movie.club_rating.desc().nullslast())
     offset = (page - 1) * MOVIES_PER_PAGE
     query = query.offset(offset).limit(MOVIES_PER_PAGE)
 
@@ -110,7 +110,7 @@ def _build_leaderboard_query(session_ids: List[int], search_query: Optional[str]
         select(
             Movie,
             func.count(Rating.id).label('rating_count'),
-            func.avg(Rating.rating).label('avg_rating'),
+            Movie.club_rating.label('avg_rating'),
         )
         .join(Session, Movie.session_id == Session.id)
         .outerjoin(Rating, Movie.id == Rating.movie_id)

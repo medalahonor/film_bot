@@ -157,6 +157,7 @@ class Movie(Base):
     description: Mapped[Optional[str]] = mapped_column(Text)
     poster_url: Mapped[Optional[str]] = mapped_column(String(1000))
     kinopoisk_rating: Mapped[Optional[float]] = mapped_column(DECIMAL(3, 1))
+    club_rating: Mapped[Optional[float]] = mapped_column(DECIMAL(4, 2))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships

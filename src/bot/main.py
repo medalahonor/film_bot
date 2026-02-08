@@ -15,6 +15,7 @@ from bot.middlewares import (
     ErrorLoggingMiddleware,
 )
 from bot.database import init_db
+from bot.log_handler import InMemoryLogHandler
 
 # Import handlers
 from bot.handlers import session, proposals, voting, rating, leaderboard, admin
@@ -25,6 +26,15 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     stream=sys.stdout
 )
+
+# Attach in-memory handler so admins can view recent logs from the bot
+_mem_handler = InMemoryLogHandler()
+_mem_handler.setFormatter(logging.Formatter(
+    '%(asctime)s %(name)s %(levelname)s %(message)s',
+    datefmt='%H:%M:%S',
+))
+logging.getLogger().addHandler(_mem_handler)
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,11 +53,7 @@ async def setup_bot_commands(bot: Bot) -> None:
 
     # Commands for private chats (admin only)
     private_commands = [
-        BotCommand(command="admin_help", description="Админская справка"),
-        BotCommand(command="add_movie", description="Добавить фильм вручную"),
-        BotCommand(command="add_ratings", description="Добавить оценки"),
-        BotCommand(command="list_movies", description="Список фильмов"),
-        BotCommand(command="db_stats", description="Статистика БД"),
+        BotCommand(command="admin", description="Админ-панель"),
     ]
     await bot.set_my_commands(private_commands, scope=BotCommandScopeAllPrivateChats())
 

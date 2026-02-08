@@ -32,6 +32,31 @@ BTN_PROPOSE = "📝 Предложить фильм"
 BTN_SLOT_1 = "📍 Слот 1"
 BTN_SLOT_2 = "📍 Слот 2"
 BTN_CANCEL = "↩️ Отмена"
+BTN_BACK = "↩️ Назад"
+
+# Admin panel
+BTN_ADMIN_SESSIONS = "📋 Сессии"
+BTN_ADMIN_MOVIES = "🎬 Фильмы (админ)"
+BTN_ADMIN_BATCH = "📥 Batch-импорт"
+BTN_ADMIN_STATS = "📊 Статистика БД"
+BTN_ADMIN_LOGS = "📜 Логи"
+BTN_ADMIN_EXIT = "↩️ Выход из панели"
+
+# Admin sessions
+BTN_ADM_FORCE_VOTING = "➡️ Начать голосование"
+BTN_ADM_ADD_MOVIE = "🎬 Добавить фильм в слот"
+BTN_ADM_DEL_SLOT_MOVIE = "🗑 Удалить фильм из слота"
+BTN_ADM_CANCEL_SESSION = "❌ Отменить сессию"
+BTN_ADM_FORCE_FINISH_VOTE = "🏁 Завершить голосование"
+BTN_ADM_SET_WINNER = "🏆 Назначить победителя"
+BTN_ADM_BACK_COLLECTING = "⏪ Вернуть на сбор"
+BTN_ADM_FORCE_COMPLETE = "✅ Завершить сессию"
+BTN_ADM_ADD_RATINGS = "📊 Добавить рейтинги"
+BTN_ADM_BACK_VOTING = "⏪ Вернуть на голосование"
+
+# Admin movies
+BTN_ADM_MOVIE_LIST = "📋 Список фильмов"
+BTN_ADM_MOVIE_SEARCH = "🔍 Найти фильм"
 
 
 # ── Reply keyboards ──────────────────────────────────────────────────────
@@ -183,5 +208,143 @@ def get_confirmation_keyboard(action: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="✅ Да", callback_data=f"confirm:{action}:yes")
     builder.button(text="❌ Нет", callback_data=f"confirm:{action}:no")
+    builder.adjust(2)
+    return builder.as_markup()
+
+
+# ── Admin keyboards ──────────────────────────────────────────────────────
+
+
+def get_admin_menu_keyboard() -> ReplyKeyboardMarkup:
+    """Main admin panel keyboard.
+
+    Layout:
+        Row 1: Сессии | Фильмы (админ)
+        Row 2: Batch-импорт | Статистика БД
+        Row 3: Логи
+        Row 4: Выход из панели
+    """
+    builder = ReplyKeyboardBuilder()
+    builder.button(text=BTN_ADMIN_SESSIONS)
+    builder.button(text=BTN_ADMIN_MOVIES)
+    builder.button(text=BTN_ADMIN_BATCH)
+    builder.button(text=BTN_ADMIN_STATS)
+    builder.button(text=BTN_ADMIN_LOGS)
+    builder.button(text=BTN_ADMIN_EXIT)
+    builder.adjust(2, 2, 1, 1)
+    return builder.as_markup(resize_keyboard=True)
+
+
+def get_admin_sessions_collecting_keyboard() -> ReplyKeyboardMarkup:
+    """Admin session keyboard for 'collecting' status."""
+    builder = ReplyKeyboardBuilder()
+    builder.button(text=BTN_ADM_FORCE_VOTING)
+    builder.button(text=BTN_ADM_ADD_MOVIE)
+    builder.button(text=BTN_ADM_DEL_SLOT_MOVIE)
+    builder.button(text=BTN_ADM_CANCEL_SESSION)
+    builder.button(text=BTN_BACK)
+    builder.adjust(1, 2, 1, 1)
+    return builder.as_markup(resize_keyboard=True)
+
+
+def get_admin_sessions_voting_keyboard() -> ReplyKeyboardMarkup:
+    """Admin session keyboard for 'voting' status."""
+    builder = ReplyKeyboardBuilder()
+    builder.button(text=BTN_ADM_FORCE_FINISH_VOTE)
+    builder.button(text=BTN_ADM_SET_WINNER)
+    builder.button(text=BTN_ADM_BACK_COLLECTING)
+    builder.button(text=BTN_ADM_CANCEL_SESSION)
+    builder.button(text=BTN_BACK)
+    builder.adjust(1, 1, 1, 1, 1)
+    return builder.as_markup(resize_keyboard=True)
+
+
+def get_admin_sessions_rating_keyboard() -> ReplyKeyboardMarkup:
+    """Admin session keyboard for 'rating' status."""
+    builder = ReplyKeyboardBuilder()
+    builder.button(text=BTN_ADM_FORCE_COMPLETE)
+    builder.button(text=BTN_ADM_ADD_RATINGS)
+    builder.button(text=BTN_ADM_BACK_VOTING)
+    builder.button(text=BTN_ADM_CANCEL_SESSION)
+    builder.button(text=BTN_BACK)
+    builder.adjust(1, 1, 1, 1, 1)
+    return builder.as_markup(resize_keyboard=True)
+
+
+def get_admin_no_session_keyboard() -> ReplyKeyboardMarkup:
+    """Admin keyboard when no active session exists."""
+    builder = ReplyKeyboardBuilder()
+    builder.button(text=BTN_BACK)
+    return builder.as_markup(resize_keyboard=True)
+
+
+def get_admin_movies_keyboard() -> ReplyKeyboardMarkup:
+    """Admin movies submenu keyboard.
+
+    Layout:
+        Row 1: Список фильмов | Найти фильм
+        Row 2: Назад
+    """
+    builder = ReplyKeyboardBuilder()
+    builder.button(text=BTN_ADM_MOVIE_LIST)
+    builder.button(text=BTN_ADM_MOVIE_SEARCH)
+    builder.button(text=BTN_BACK)
+    builder.adjust(2, 1)
+    return builder.as_markup(resize_keyboard=True)
+
+
+def get_admin_back_keyboard() -> ReplyKeyboardMarkup:
+    """Keyboard with only the back button."""
+    builder = ReplyKeyboardBuilder()
+    builder.button(text=BTN_BACK)
+    return builder.as_markup(resize_keyboard=True)
+
+
+def get_admin_movie_actions_keyboard(
+    movie_id: int,
+    page: int = 1,
+) -> InlineKeyboardMarkup:
+    """Inline actions for a single movie in admin list."""
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="✏️ Рейтинг",
+        callback_data=f"adm_edit_rating:{movie_id}",
+    )
+    builder.button(
+        text="🗑 Удалить",
+        callback_data=f"adm_delete:{movie_id}:{page}",
+    )
+    builder.adjust(2)
+    return builder.as_markup()
+
+
+def get_admin_movie_list_pagination(
+    current_page: int,
+    total_pages: int,
+) -> InlineKeyboardMarkup:
+    """Pagination keyboard for admin movie list."""
+    builder = InlineKeyboardBuilder()
+    if current_page > 1:
+        builder.button(
+            text="◀️ Назад",
+            callback_data=f"adm_movies_page:{current_page - 1}",
+        )
+    builder.button(
+        text=f"{current_page}/{total_pages}",
+        callback_data="adm_movies_page:noop",
+    )
+    if current_page < total_pages:
+        builder.button(
+            text="Далее ▶️",
+            callback_data=f"adm_movies_page:{current_page + 1}",
+        )
+    return builder.as_markup()
+
+
+def get_admin_delete_confirm_keyboard(movie_id: int) -> InlineKeyboardMarkup:
+    """Confirmation inline keyboard for movie deletion."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ Да, удалить", callback_data=f"adm_delete_yes:{movie_id}")
+    builder.button(text="❌ Нет", callback_data="adm_delete_no")
     builder.adjust(2)
     return builder.as_markup()
