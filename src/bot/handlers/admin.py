@@ -49,6 +49,7 @@ async def show_admin_help(message: Message) -> None:
     if message.chat.type != 'private':
         return
 
+    logger.info("Admin %s requested admin_help", message.from_user.id)
     help_text = (
         "👑 <b>АДМИНСКИЕ КОМАНДЫ</b>\n\n"
 
@@ -79,6 +80,7 @@ async def start_add_movie(message: Message, state: FSMContext) -> None:
     if message.chat.type != 'private':
         return
 
+    logger.info("Admin %s started add_movie flow", message.from_user.id)
     await state.clear()
     await try_delete_message(message)
 
@@ -96,10 +98,15 @@ async def start_add_movie(message: Message, state: FSMContext) -> None:
 async def handle_movie_url(message: Message, state: FSMContext) -> None:
     """Handle movie URL or title."""
     url = message.text.strip()
+    logger.info("Admin %s sent movie URL: %s", message.from_user.id, url[:100])
     await try_delete_message(message)
 
     try:
         movie_data = await parse_movie_data(url)
+        logger.info(
+            "Admin %s parsed movie: '%s'",
+            message.from_user.id, movie_data.get('title'),
+        )
         await state.update_data(movie_data=movie_data)
 
         info = await format_movie_info(movie_data)
@@ -109,6 +116,10 @@ async def handle_movie_url(message: Message, state: FSMContext) -> None:
             reply_markup=get_confirmation_keyboard("add_movie"),
         )
     except KinopoiskParserError as e:
+        logger.warning(
+            "Admin %s: movie parse error for '%s': %s",
+            message.from_user.id, url[:100], e,
+        )
         await replace_bot_message(
             message, state,
             f"❌ {str(e)}\n\n"
@@ -241,6 +252,7 @@ async def start_add_ratings(message: Message, state: FSMContext) -> None:
     if message.chat.type != 'private':
         return
 
+    logger.info("Admin %s started add_ratings: %s", message.from_user.id, message.text)
     await state.clear()
 
     movie_id = _parse_movie_id_arg(message.text)
@@ -344,6 +356,7 @@ async def list_movies(message: Message) -> None:
     if message.chat.type != 'private':
         return
 
+    logger.info("Admin %s requested list_movies", message.from_user.id)
     async with AsyncSessionLocal() as db:
         try:
             result = await db.execute(
@@ -382,6 +395,7 @@ async def show_db_stats(message: Message) -> None:
     if message.chat.type != 'private':
         return
 
+    logger.info("Admin %s requested db_stats", message.from_user.id)
     async with AsyncSessionLocal() as db:
         try:
             users_count = (await db.execute(select(func.count(User.id)))).scalar()

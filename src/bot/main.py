@@ -9,7 +9,11 @@ from aiogram.enums import ParseMode
 from aiogram.types import BotCommand, BotCommandScopeAllGroupChats, BotCommandScopeAllPrivateChats, BotCommandScopeDefault
 
 from bot.config import config
-from bot.middlewares import AccessCheckMiddleware
+from bot.middlewares import (
+    AccessCheckMiddleware,
+    PollAnswerLoggingMiddleware,
+    ErrorLoggingMiddleware,
+)
 from bot.database import init_db
 
 # Import handlers
@@ -57,7 +61,7 @@ async def main() -> None:
         config.validate()
         logger.info("Configuration validated successfully")
     except ValueError as e:
-        logger.error(f"Configuration error: {e}")
+        logger.error("Configuration error: %s", e)
         sys.exit(1)
 
     # Initialize database
@@ -65,7 +69,7 @@ async def main() -> None:
         await init_db()
         logger.info("Database initialized successfully")
     except Exception as e:
-        logger.error(f"Database initialization error: {e}")
+        logger.error("Database initialization error: %s", e)
         sys.exit(1)
 
     # Create bot instance
@@ -78,14 +82,22 @@ async def main() -> None:
     try:
         await setup_bot_commands(bot)
     except Exception as e:
-        logger.warning(f"Failed to set bot commands: {e}")
+        logger.warning("Failed to set bot commands: %s", e)
 
     # Create dispatcher
     dp = Dispatcher()
 
     # Register middleware
+    # Error logging middleware (outermost — catches all unhandled exceptions)
+    dp.message.outer_middleware(ErrorLoggingMiddleware())
+    dp.callback_query.outer_middleware(ErrorLoggingMiddleware())
+
+    # Access check middleware
     dp.message.middleware(AccessCheckMiddleware())
     dp.callback_query.middleware(AccessCheckMiddleware())
+
+    # PollAnswer logging (no access check — poll answers have no chat context)
+    dp.poll_answer.middleware(PollAnswerLoggingMiddleware())
 
     # Register routers (handlers)
     dp.include_router(session.router)
@@ -110,5 +122,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
     except Exception as e:
-        logger.exception(f"Unexpected error: {e}")
+        logger.exception("Unexpected error: %s", e)
         sys.exit(1)

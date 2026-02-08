@@ -114,6 +114,7 @@ async def update_pinned_message(
 @router.message(F.text == BTN_PROPOSE)
 async def propose_film_button(message: Message, state: FSMContext) -> None:
     """Handle 'Предложить фильм' button — start propose flow."""
+    logger.info("User %s started propose flow", message.from_user.id)
     await state.clear()
     await try_delete_message(message)
 
@@ -131,7 +132,7 @@ async def propose_film_button(message: Message, state: FSMContext) -> None:
             )
             await state.update_data(bot_message_id=bot_msg.message_id)
         except Exception as e:
-            logger.exception("Error in propose flow: %s", e)
+            logger.exception("Error in propose flow for user %s: %s", message.from_user.id, e)
             await message.answer(
                 "❌ Произошла ошибка.",
                 reply_markup=get_main_menu_keyboard(),
@@ -146,11 +147,13 @@ async def propose_url_received(message: Message, state: FSMContext) -> None:
     """
     user_text = message.text or ""
     from_user = message.from_user
+    logger.info("User %s sent proposal URL: %s", from_user.id, user_text[:100])
 
     await try_delete_message(message)
 
     urls = extract_kinopoisk_urls(user_text)
     if not urls:
+        logger.info("User %s sent invalid URL: %s", from_user.id, user_text[:100])
         text = (
             "⚠️ Не найдена корректная ссылка на Кинопоиск.\n\n"
             "Пример: https://www.kinopoisk.ru/film/301/\n\n"
@@ -205,6 +208,10 @@ async def handle_slot_selection(callback: CallbackQuery, state: FSMContext) -> N
         allowed_user_id = int(parts[2]) if len(parts) > 2 else None
 
         if allowed_user_id is not None and callback.from_user.id != allowed_user_id:
+            logger.info(
+                "User %s tried to select slot for another user %s",
+                callback.from_user.id, allowed_user_id,
+            )
             await callback.answer(
                 "⛔ Эта кнопка не для вас — слот может выбрать только тот, кто предложил фильм.",
                 show_alert=True,
@@ -247,6 +254,11 @@ async def handle_slot_selection(callback: CallbackQuery, state: FSMContext) -> N
             await update_pinned_message(db, session, callback.message)
 
         await state.clear()
+
+        logger.info(
+            "User %s added movie '%s' to slot %s in session %s",
+            callback.from_user.id, movie_data.get('title'), slot, session_id,
+        )
 
         await callback.message.edit_text(
             callback.message.html_text

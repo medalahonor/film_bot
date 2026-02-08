@@ -1,9 +1,9 @@
-"""Middleware for access control."""
+"""Middleware for access control and logging."""
 import logging
 from typing import Callable, Dict, Any, Awaitable, Optional
 
 from aiogram import BaseMiddleware
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, PollAnswer
 
 from bot.config import config
 
@@ -131,6 +131,63 @@ class AccessCheckMiddleware(BaseMiddleware):
                 config.TOPIC_IDS,
             )
         return is_allowed
+
+
+class PollAnswerLoggingMiddleware(BaseMiddleware):
+    """Middleware to log PollAnswer events.
+
+    PollAnswer events don't have a chat context, so
+    AccessCheckMiddleware can't handle them.  This middleware
+    ensures every poll answer is recorded in the log.
+    """
+
+    async def __call__(
+        self,
+        handler: Callable[[PollAnswer, Dict[str, Any]], Awaitable[Any]],
+        event: PollAnswer,
+        data: Dict[str, Any],
+    ) -> Any:
+        user = event.user
+        logger.info(
+            "event=PollAnswer user_id=%d poll_id=%s options=%s",
+            user.id if user else 0,
+            event.poll_id,
+            event.option_ids,
+        )
+        try:
+            return await handler(event, data)
+        except Exception as exc:
+            logger.exception(
+                "Error handling PollAnswer from user %d: %s",
+                user.id if user else 0, exc,
+            )
+            raise
+
+
+class ErrorLoggingMiddleware(BaseMiddleware):
+    """Middleware to catch and log unhandled exceptions in handlers.
+
+    Wraps Message and CallbackQuery handlers so that any exception
+    that slips through is logged with full traceback.  The exception
+    is re-raised so that aiogram's default behaviour is preserved.
+    """
+
+    async def __call__(
+        self,
+        handler: Callable[[Message | CallbackQuery, Dict[str, Any]], Awaitable[Any]],
+        event: Message | CallbackQuery,
+        data: Dict[str, Any],
+    ) -> Any:
+        try:
+            return await handler(event, data)
+        except Exception as exc:
+            user_id = event.from_user.id if event.from_user else 0
+            event_type = type(event).__name__
+            logger.exception(
+                "Unhandled error in %s handler for user %d: %s",
+                event_type, user_id, exc,
+            )
+            raise
 
 
 def _extractThreadId(event: Message | CallbackQuery) -> Optional[int]:

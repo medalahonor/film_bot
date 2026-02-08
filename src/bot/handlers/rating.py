@@ -175,6 +175,7 @@ async def _save_or_update_rating(
 async def rate_movies(message: Message, state: FSMContext) -> None:
     """Send rating interface to the group: inline 1-10 keyboards + scoreboard."""
     await state.clear()
+    logger.info("User %s requested rating interface", message.from_user.id)
     async with AsyncSessionLocal() as db:
         try:
             session = await _get_active_rating_session(
@@ -269,6 +270,7 @@ async def handle_rating(callback: CallbackQuery) -> None:
 async def complete_session(message: Message, state: FSMContext) -> None:
     """Complete current session via reply keyboard button."""
     await state.clear()
+    logger.info("User %s requested session completion", message.from_user.id)
     async with AsyncSessionLocal() as db:
         try:
             session = await _get_active_rating_session(

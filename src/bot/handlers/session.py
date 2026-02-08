@@ -35,6 +35,10 @@ router = Router()
 @router.message(Command("start"))
 async def cmd_start(message: Message) -> None:
     """Show welcome message and main menu keyboard."""
+    logger.info(
+        "User %s called /start in chat %s",
+        message.from_user.id, message.chat.id,
+    )
     await message.answer(
         "🎬 <b>Добро пожаловать в Киноклуб!</b>\n\n"
         "Используйте кнопки меню внизу экрана для управления ботом.\n"
@@ -51,6 +55,12 @@ async def handle_cancel(message: Message, state: FSMContext) -> None:
     proposal flow) and deletes the user's cancel message to keep
     the chat tidy.
     """
+    current_state = await state.get_state()
+    logger.info(
+        "User %s cancelled action (state=%s)",
+        message.from_user.id, current_state,
+    )
+
     data = await state.get_data()
     bot_message_id = data.get('bot_message_id')
     await state.clear()
@@ -58,8 +68,8 @@ async def handle_cancel(message: Message, state: FSMContext) -> None:
     # Delete user's cancel message
     try:
         await message.delete()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Failed to delete cancel message: %s", exc)
 
     # Delete bot's prompt message if it was saved in FSM
     if bot_message_id:
@@ -68,8 +78,8 @@ async def handle_cancel(message: Message, state: FSMContext) -> None:
                 chat_id=message.chat.id,
                 message_id=bot_message_id,
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to delete bot prompt message %s: %s", bot_message_id, exc)
 
     await message.answer(
         "↩️ Действие отменено.",
@@ -133,16 +143,19 @@ async def create_new_session(message: Message, state: FSMContext) -> None:
             try:
                 await pin_message.pin(disable_notification=True)
             except Exception as e:
-                logger.warning(f"Failed to pin message: {e}")
+                logger.warning("Failed to pin message: %s", e)
             
             # Update session with pinned message ID
             new_session.pinned_message_id = pin_message.message_id
             await db.commit()
             
-            logger.info(f"Created new session {new_session.id} in group {group.id}")
+            logger.info(
+                "User %s created new session %s in group %s",
+                message.from_user.id, new_session.id, group.id,
+            )
             
         except Exception as e:
-            logger.exception(f"Error creating session: {e}")
+            logger.exception("Error creating session: %s", e)
             await message.answer(
                 "❌ Произошла ошибка при создании сессии. Попробуйте позже."
             )
@@ -152,6 +165,7 @@ async def create_new_session(message: Message, state: FSMContext) -> None:
 async def show_session_status(message: Message, state: FSMContext) -> None:
     """Show current session status via reply keyboard button."""
     await state.clear()
+    logger.info("User %s requested session status", message.from_user.id)
     async with AsyncSessionLocal() as db:
         try:
             group = await get_group_by_telegram_id(db, message.chat.id)
@@ -196,7 +210,7 @@ async def show_session_status(message: Message, state: FSMContext) -> None:
             await message.answer(response)
             
         except Exception as e:
-            logger.exception(f"Error showing status: {e}")
+            logger.exception("Error showing status: %s", e)
             await message.answer(
                 "❌ Произошла ошибка при получении статуса."
             )
@@ -234,10 +248,13 @@ async def cancel_session(message: Message, state: FSMContext) -> None:
                 "✅ Сессия отменена и помечена как завершенная."
             )
             
-            logger.info(f"Session {session.id} cancelled by admin {message.from_user.id}")
+            logger.info(
+                "Session %s cancelled by user %s",
+                session.id, message.from_user.id,
+            )
             
         except Exception as e:
-            logger.exception(f"Error cancelling session: {e}")
+            logger.exception("Error cancelling session: %s", e)
             await message.answer(
                 "❌ Произошла ошибка при отмене сессии."
             )
@@ -248,6 +265,7 @@ async def cancel_session(message: Message, state: FSMContext) -> None:
 async def show_help(message: Message, state: FSMContext) -> None:
     """Show help message with available commands."""
     await state.clear()
+    logger.info("User %s requested help", message.from_user.id)
     help_text = (
         "🎬 <b>Бот киноклуба</b>\n\n"
         "Используйте кнопки меню внизу экрана.\n"

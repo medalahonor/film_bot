@@ -220,6 +220,7 @@ def format_leaderboard_message(
 async def show_leaderboard(message: Message, state: FSMContext) -> None:
     """Show leaderboard with top rated movies via reply keyboard button."""
     await state.clear()
+    logger.info("User %s requested leaderboard", message.from_user.id)
     async with AsyncSessionLocal() as db:
         try:
             group = await _resolve_group(db, message.chat.id, message.chat.type)
@@ -264,6 +265,7 @@ async def handle_leaderboard_page(callback: CallbackQuery) -> None:
     """Handle leaderboard pagination."""
     try:
         page = int(callback.data.split(":")[1])
+        logger.info("User %s requested leaderboard page %s", callback.from_user.id, page)
 
         async with AsyncSessionLocal() as db:
             group = await _resolve_group(
@@ -295,6 +297,7 @@ async def handle_leaderboard_page(callback: CallbackQuery) -> None:
 @router.callback_query(F.data == "lb_search")
 async def handle_leaderboard_search_button(callback: CallbackQuery, state: FSMContext) -> None:
     """Handle search button press (inline button in leaderboard)."""
+    logger.info("User %s pressed leaderboard search button", callback.from_user.id)
     await state.set_state(LeaderboardState.waiting_for_search)
 
     bot_msg = await callback.message.answer(
@@ -307,6 +310,7 @@ async def handle_leaderboard_search_button(callback: CallbackQuery, state: FSMCo
 
 async def perform_search(message: Message, query: str) -> None:
     """Perform movie search and send results."""
+    logger.info("User %s searching movies: '%s'", message.from_user.id, query)
     async with AsyncSessionLocal() as db:
         try:
             group = await _resolve_group(db, message.chat.id, message.chat.type)
@@ -342,6 +346,7 @@ async def perform_search(message: Message, query: str) -> None:
 @router.message(F.text == BTN_SEARCH)
 async def search_button(message: Message, state: FSMContext) -> None:
     """Start search via button — ask for query."""
+    logger.info("User %s started search flow", message.from_user.id)
     await state.clear()
     await try_delete_message(message)
 
@@ -376,6 +381,7 @@ async def search_from_state(message: Message, state: FSMContext) -> None:
 async def show_stats(message: Message, state: FSMContext) -> None:
     """Show general statistics about the film club via reply keyboard button."""
     await state.clear()
+    logger.info("User %s requested stats", message.from_user.id)
     async with AsyncSessionLocal() as db:
         try:
             group = await _resolve_group(db, message.chat.id, message.chat.type)
