@@ -205,7 +205,7 @@ def format_leaderboard_message(
         else:
             response += "   Нет оценок\n"
 
-        response += f"   Предложил: {proposer_name}\n\n"
+        response += "\n"
 
     if not search_query:
         response += f"📊 Всего просмотрено: {total_movies} фильмов"
@@ -428,7 +428,6 @@ def _format_search_results(query: str, movies_data: List[dict]) -> str:
         else:
             response += "Нет оценок\n"
 
-        response += f"Предложил: {proposer_name}\n"
         response += f"#{data['rank']} в общем рейтинге\n\n"
 
     response += f"Найдено: {len(movies_data)} фильм(ов)"
