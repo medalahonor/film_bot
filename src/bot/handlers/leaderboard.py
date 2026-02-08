@@ -200,6 +200,8 @@ def format_leaderboard_message(
 
         if rating_count > 0:
             response += f"   ⭐ {avg_rating:.2f} ({rating_count} оценок)\n"
+        elif avg_rating and avg_rating > 0:
+            response += f"   ⭐ {avg_rating:.2f}\n"
         else:
             response += "   Нет оценок\n"
 
