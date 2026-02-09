@@ -25,7 +25,7 @@ services:
         condition: service_healthy
     environment:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      TELEGRAM_GROUP_ID: ${TELEGRAM_GROUP_ID}
+      TELEGRAM_GROUP_IDS: ${TELEGRAM_GROUP_IDS}
       TELEGRAM_ADMIN_IDS: ${TELEGRAM_ADMIN_IDS}
       DATABASE_URL: postgresql+asyncpg://filmbot:${DB_PASSWORD}@db:5432/filmbot
     volumes:

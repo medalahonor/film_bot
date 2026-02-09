@@ -62,6 +62,7 @@ from bot.keyboards import (
     BTN_ADM_BACK_VOTING,
     BTN_ADM_MOVIE_LIST,
     BTN_ADM_MOVIE_SEARCH,
+    BTN_ADM_CHANGE_GROUP,
     get_admin_menu_keyboard,
     get_admin_sessions_collecting_keyboard,
     get_admin_sessions_voting_keyboard,
@@ -74,6 +75,7 @@ from bot.keyboards import (
     get_admin_delete_confirm_keyboard,
     get_confirmation_keyboard,
     get_main_menu_keyboard,
+    get_admin_group_selector_keyboard,
 )
 from bot.utils import try_delete_message, replace_bot_message, abort_flow, finish_flow
 from bot.log_handler import get_recent_logs
@@ -90,6 +92,7 @@ MOVIES_PER_PAGE = 5
 
 class AdminMenuState(StatesGroup):
     """Top-level admin panel navigation."""
+    select_group = State()
     main_menu = State()
     sessions_menu = State()
     movies_menu = State()
@@ -142,14 +145,72 @@ async def cmd_admin(message: Message, state: FSMContext) -> None:
 
     await state.clear()
     await try_delete_message(message)
-    await state.set_state(AdminMenuState.main_menu)
+
+    if len(config.GROUP_IDS) == 1:
+        await state.update_data(admin_group_id=config.GROUP_IDS[0])
+        await state.set_state(AdminMenuState.main_menu)
+        bot_msg = await message.answer(
+            "👑 <b>Админ-панель</b>\n\n"
+            "Выберите раздел:",
+            reply_markup=get_admin_menu_keyboard(),
+        )
+        await state.update_data(bot_message_id=bot_msg.message_id)
+    else:
+        await _show_group_selector(message, state)
+
+
+async def _get_admin_group_id(state: FSMContext) -> Optional[int]:
+    """Extract admin_group_id from FSM data."""
+    data = await state.get_data()
+    return data.get("admin_group_id")
+
+
+async def _show_group_selector(message: Message, state: FSMContext) -> None:
+    """Show inline keyboard for group selection."""
+    await state.set_state(AdminMenuState.select_group)
+    groups: List[Tuple[int, str]] = []
+    async with AsyncSessionLocal() as db:
+        for gid in config.GROUP_IDS:
+            group = await get_or_create_group(db, gid)
+            name = group.name or str(gid)
+            groups.append((gid, name))
 
     bot_msg = await message.answer(
         "👑 <b>Админ-панель</b>\n\n"
-        "Выберите раздел:",
+        "Выберите группу:",
+        reply_markup=get_admin_group_selector_keyboard(groups),
+    )
+    await state.update_data(bot_message_id=bot_msg.message_id)
+
+
+@router.callback_query(F.data.startswith("adm_group:"))
+async def admin_select_group(callback: CallbackQuery, state: FSMContext) -> None:
+    """Handle group selection from inline keyboard."""
+    group_tid = int(callback.data.split(":")[1])
+    await callback.answer()
+    await state.update_data(admin_group_id=group_tid)
+    await state.set_state(AdminMenuState.main_menu)
+
+    try:
+        await callback.message.edit_text(
+            "👑 <b>Админ-панель</b>\n\n"
+            "Выберите раздел:",
+        )
+    except Exception:
+        pass
+
+    bot_msg = await callback.message.answer(
+        "👑 <b>Админ-панель</b>\n\nВыберите раздел:",
         reply_markup=get_admin_menu_keyboard(),
     )
     await state.update_data(bot_message_id=bot_msg.message_id)
+
+
+@router.message(F.text == BTN_ADM_CHANGE_GROUP)
+async def admin_change_group(message: Message, state: FSMContext) -> None:
+    """Switch to a different group."""
+    await try_delete_message(message)
+    await _show_group_selector(message, state)
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -192,7 +253,8 @@ async def admin_sessions(message: Message, state: FSMContext) -> None:
     await state.set_state(AdminMenuState.sessions_menu)
 
     async with AsyncSessionLocal() as db:
-        group = await get_or_create_group(db, config.GROUP_ID, "Film Club")
+        group_tid = await _get_admin_group_id(state)
+        group = await get_or_create_group(db, group_tid)
         session = await get_active_session_any(db, group.id)
 
         if not session:
@@ -221,7 +283,7 @@ async def admin_force_voting(message: Message, state: FSMContext) -> None:
     """Force transition from collecting to voting."""
     await try_delete_message(message)
     async with AsyncSessionLocal() as db:
-        session = await _get_active_session(db)
+        session = await _get_active_session(db, await _get_admin_group_id(state))
         if not session or session.status != STATUS_COLLECTING:
             await replace_bot_message(
                 message, state,
@@ -248,7 +310,7 @@ async def admin_add_movie_start(message: Message, state: FSMContext) -> None:
     """Start adding a movie to the active session."""
     await try_delete_message(message)
     async with AsyncSessionLocal() as db:
-        session = await _get_active_session(db)
+        session = await _get_active_session(db, await _get_admin_group_id(state))
         if not session or session.status != STATUS_COLLECTING:
             await replace_bot_message(
                 message, state,
@@ -321,7 +383,7 @@ async def admin_add_movie_slot(message: Message, state: FSMContext) -> None:
 
     async with AsyncSessionLocal() as db:
         try:
-            session = await _get_active_session(db)
+            session = await _get_active_session(db, await _get_admin_group_id(state))
             if not session:
                 await abort_flow(message, state, "❌ Активная сессия не найдена.")
                 return
@@ -359,7 +421,7 @@ async def admin_del_slot_movie(message: Message, state: FSMContext) -> None:
     """Show movies in active session for deletion."""
     await try_delete_message(message)
     async with AsyncSessionLocal() as db:
-        session = await _get_active_session(db)
+        session = await _get_active_session(db, await _get_admin_group_id(state))
         if not session or session.status != STATUS_COLLECTING:
             await replace_bot_message(
                 message, state,
@@ -419,7 +481,7 @@ async def admin_force_finish_vote(message: Message, state: FSMContext) -> None:
     """Force finish voting and transition to rating."""
     await try_delete_message(message)
     async with AsyncSessionLocal() as db:
-        session = await _get_active_session(db)
+        session = await _get_active_session(db, await _get_admin_group_id(state))
         if not session or session.status != STATUS_VOTING:
             await replace_bot_message(
                 message, state,
@@ -446,7 +508,7 @@ async def admin_set_winner_start(message: Message, state: FSMContext) -> None:
     """Start setting a winner manually."""
     await try_delete_message(message)
     async with AsyncSessionLocal() as db:
-        session = await _get_active_session(db)
+        session = await _get_active_session(db, await _get_admin_group_id(state))
         if not session or session.status != STATUS_VOTING:
             await replace_bot_message(
                 message, state,
@@ -480,7 +542,7 @@ async def admin_set_winner_slot(message: Message, state: FSMContext) -> None:
     await state.update_data(winner_slot=slot)
 
     async with AsyncSessionLocal() as db:
-        session = await _get_active_session(db)
+        session = await _get_active_session(db, await _get_admin_group_id(state))
         if not session:
             await abort_flow(message, state, "❌ Сессия не найдена.")
             return
@@ -517,7 +579,7 @@ async def admin_set_winner_cmd(message: Message, state: FSMContext) -> None:
     await try_delete_message(message)
 
     async with AsyncSessionLocal() as db:
-        session = await _get_active_session(db)
+        session = await _get_active_session(db, await _get_admin_group_id(state))
         movie = await get_movie_by_id(db, movie_id)
 
         if not session or not movie:
@@ -543,7 +605,7 @@ async def admin_back_to_collecting(message: Message, state: FSMContext) -> None:
     """Roll back session from voting to collecting."""
     await try_delete_message(message)
     async with AsyncSessionLocal() as db:
-        session = await _get_active_session(db)
+        session = await _get_active_session(db, await _get_admin_group_id(state))
         if not session or session.status != STATUS_VOTING:
             await replace_bot_message(
                 message, state, "⚠️ Нет сессии в статусе «голосование».",
@@ -566,7 +628,7 @@ async def admin_force_complete(message: Message, state: FSMContext) -> None:
     """Force complete the session."""
     await try_delete_message(message)
     async with AsyncSessionLocal() as db:
-        session = await _get_active_session(db)
+        session = await _get_active_session(db, await _get_admin_group_id(state))
         if not session or session.status != STATUS_RATING:
             await replace_bot_message(
                 message, state, "⚠️ Нет сессии в статусе «рейтинг».",
@@ -587,7 +649,7 @@ async def admin_add_ratings_start(message: Message, state: FSMContext) -> None:
     """Start adding ratings for a winner movie."""
     await try_delete_message(message)
     async with AsyncSessionLocal() as db:
-        session = await _get_active_session(db)
+        session = await _get_active_session(db, await _get_admin_group_id(state))
         if not session or session.status != STATUS_RATING:
             await replace_bot_message(
                 message, state, "⚠️ Нет сессии в статусе «рейтинг».",
@@ -675,7 +737,7 @@ async def admin_add_ratings_input(message: Message, state: FSMContext) -> None:
             avg = await recalc_club_rating(db, movie_id)
 
             await state.set_state(AdminMenuState.sessions_menu)
-            session = await _get_active_session(db)
+            session = await _get_active_session(db, await _get_admin_group_id(state))
             avg_str = f"{avg:.2f}" if avg else "—"
             await replace_bot_message(
                 message, state,
@@ -695,7 +757,7 @@ async def admin_back_to_voting(message: Message, state: FSMContext) -> None:
     """Roll back session from rating to voting."""
     await try_delete_message(message)
     async with AsyncSessionLocal() as db:
-        session = await _get_active_session(db)
+        session = await _get_active_session(db, await _get_admin_group_id(state))
         if not session or session.status != STATUS_RATING:
             await replace_bot_message(
                 message, state, "⚠️ Нет сессии в статусе «рейтинг».",
@@ -718,7 +780,7 @@ async def admin_cancel_session(message: Message, state: FSMContext) -> None:
     """Cancel (complete) the active session."""
     await try_delete_message(message)
     async with AsyncSessionLocal() as db:
-        session = await _get_active_session(db)
+        session = await _get_active_session(db, await _get_admin_group_id(state))
         if not session:
             await replace_bot_message(
                 message, state, "⚠️ Нет активной сессии.",
@@ -1090,7 +1152,7 @@ async def admin_batch_confirm(callback: CallbackQuery, state: FSMContext) -> Non
 
     async with AsyncSessionLocal() as db:
         try:
-            group = await get_or_create_group(db, config.GROUP_ID, "Film Club")
+            group = await get_or_create_group(db, data["admin_group_id"])
             system_user = await _get_or_create_system_user(db)
             imported = 0
 
@@ -1228,9 +1290,9 @@ async def admin_logs(message: Message, state: FSMContext) -> None:
 # ══════════════════════════════════════════════════════════════════════════
 
 
-async def _get_active_session(db) -> Optional[Session]:
-    """Get any active session for the configured group."""
-    group = await get_or_create_group(db, config.GROUP_ID, "Film Club")
+async def _get_active_session(db, group_telegram_id: int) -> Optional[Session]:
+    """Get any active session for the given group."""
+    group = await get_or_create_group(db, group_telegram_id)
     return await get_active_session_any(db, group.id)
 
 
@@ -1285,7 +1347,7 @@ async def _return_to_sessions(message: Message, state: FSMContext) -> None:
     await state.set_state(AdminMenuState.sessions_menu)
 
     async with AsyncSessionLocal() as db:
-        session = await _get_active_session(db)
+        session = await _get_active_session(db, await _get_admin_group_id(state))
         if not session:
             await replace_bot_message(
                 message, state,

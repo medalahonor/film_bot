@@ -18,14 +18,21 @@ from bot.database.status_manager import get_status_by_code, STATUS_COMPLETED
 logger = logging.getLogger(__name__)
 
 
-def resolve_telegram_group_id(chat_id: int, chat_type: str) -> int:
+def resolve_telegram_group_id(
+    chat_id: int,
+    chat_type: str,
+    private_group_id: Optional[int] = None,
+) -> int:
     """Return the Telegram group ID, mapping private chats to the configured group.
 
-    In private chats (admin), the bot operates on the configured GROUP_ID.
+    In private chats (admin), uses ``private_group_id`` if given,
+    otherwise falls back to the first configured group.
     In group/supergroup chats, the chat_id itself is the group ID.
     """
     if chat_type == "private":
-        return config.GROUP_ID
+        if private_group_id is not None:
+            return private_group_id
+        return config.GROUP_IDS[0]
     return chat_id
 
 

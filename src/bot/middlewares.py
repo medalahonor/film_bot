@@ -50,7 +50,7 @@ class AccessCheckMiddleware(BaseMiddleware):
 
         # Check for group/supergroup chats
         if chat_type in ['group', 'supergroup']:
-            if chat.id != config.GROUP_ID:
+            if chat.id not in config.GROUP_IDS:
                 logger.warning(
                     "Rejected: unauthorized group chat_id=%d user_id=%d",
                     chat.id,
@@ -63,7 +63,7 @@ class AccessCheckMiddleware(BaseMiddleware):
                 return None
 
             # Check topic restriction for supergroups
-            if not self._isAllowedTopic(event, chat_type):
+            if not self._isAllowedTopic(event, chat_type, chat.id):
                 logger.info(
                     "Rejected: topic not allowed user_id=%d topic_id=%s",
                     user_id,
@@ -102,17 +102,19 @@ class AccessCheckMiddleware(BaseMiddleware):
     @staticmethod
     def _isAllowedTopic(
         event: Message | CallbackQuery,
-        chat_type: str
+        chat_type: str,
+        chat_id: int,
     ) -> bool:
         """Check if the event comes from an allowed topic.
 
         Rules:
-        - No TOPIC_IDS configured → no restriction.
+        - No topic configured for this group → no restriction.
         - Chat is a regular group (not supergroup) → no restriction.
         - Supergroup without forum topics → no restriction.
-        - Supergroup with forum topics → allow only configured topic IDs.
+        - Supergroup with forum topics → allow only configured topic ID.
         """
-        if not config.TOPIC_IDS:
+        topic_id = config.GROUP_TOPIC_MAP.get(chat_id)
+        if topic_id is None:
             return True
 
         if chat_type != "supergroup":
@@ -120,15 +122,15 @@ class AccessCheckMiddleware(BaseMiddleware):
 
         thread_id = _extractThreadId(event)
         if thread_id is None:
-            # Supergroup without forum topics enabled — no restriction
             return True
 
-        is_allowed = thread_id in config.TOPIC_IDS
+        is_allowed = thread_id == topic_id
         if not is_allowed:
             logger.debug(
-                "Blocked event in topic %d (allowed: %s)",
+                "Blocked event in topic %d (allowed: %s for group %d)",
                 thread_id,
-                config.TOPIC_IDS,
+                topic_id,
+                chat_id,
             )
         return is_allowed
 

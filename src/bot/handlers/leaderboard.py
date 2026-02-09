@@ -44,11 +44,19 @@ async def _resolve_group(
     db: AsyncSession,
     chat_id: int,
     chat_type: str,
+    state: FSMContext = None,
 ):
-    """Resolve the internal group from a chat. Returns (group, error_msg)."""
+    """Resolve the internal group from a chat.
+
+    For private chats, checks FSM data for admin_group_id first.
+    """
+    if chat_type == "private" and state:
+        data = await state.get_data()
+        group_tid = data.get("admin_group_id")
+        if group_tid:
+            return await get_group_by_telegram_id(db, group_tid)
     group_telegram_id = resolve_telegram_group_id(chat_id, chat_type)
-    group = await get_group_by_telegram_id(db, group_telegram_id)
-    return group
+    return await get_group_by_telegram_id(db, group_telegram_id)
 
 
 async def _query_winner_movies(
@@ -225,7 +233,9 @@ async def show_leaderboard(message: Message, state: FSMContext) -> None:
     logger.info("User %s requested leaderboard", message.from_user.id)
     async with AsyncSessionLocal() as db:
         try:
-            group = await _resolve_group(db, message.chat.id, message.chat.type)
+            group = await _resolve_group(
+                db, message.chat.id, message.chat.type, state,
+            )
             if not group:
                 await message.answer(
                     "ℹ️ Группа не найдена. Сначала создайте сессию в группе."
@@ -386,7 +396,9 @@ async def show_stats(message: Message, state: FSMContext) -> None:
     logger.info("User %s requested stats", message.from_user.id)
     async with AsyncSessionLocal() as db:
         try:
-            group = await _resolve_group(db, message.chat.id, message.chat.type)
+            group = await _resolve_group(
+                db, message.chat.id, message.chat.type, state,
+            )
             if not group:
                 await message.answer("ℹ️ Группа не найдена.")
                 return

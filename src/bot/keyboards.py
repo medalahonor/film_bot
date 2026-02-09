@@ -1,6 +1,10 @@
 """Keyboards for the bot (inline + reply)."""
+from typing import List, Tuple
+
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
+
+from bot.config import config
 
 
 # ── Reply keyboard button labels ─────────────────────────────────────────
@@ -41,6 +45,7 @@ BTN_ADMIN_BATCH = "📥 Batch-импорт"
 BTN_ADMIN_STATS = "📊 Статистика БД"
 BTN_ADMIN_LOGS = "📜 Логи"
 BTN_ADMIN_EXIT = "↩️ Выход из панели"
+BTN_ADM_CHANGE_GROUP = "🔄 Сменить группу"
 
 # Admin sessions
 BTN_ADM_FORCE_VOTING = "➡️ Начать голосование"
@@ -221,7 +226,7 @@ def get_admin_menu_keyboard() -> ReplyKeyboardMarkup:
     Layout:
         Row 1: Сессии | Фильмы (админ)
         Row 2: Batch-импорт | Статистика БД
-        Row 3: Логи
+        Row 3: Логи | (Сменить группу — если несколько групп)
         Row 4: Выход из панели
     """
     builder = ReplyKeyboardBuilder()
@@ -230,9 +235,29 @@ def get_admin_menu_keyboard() -> ReplyKeyboardMarkup:
     builder.button(text=BTN_ADMIN_BATCH)
     builder.button(text=BTN_ADMIN_STATS)
     builder.button(text=BTN_ADMIN_LOGS)
+    if len(config.GROUP_IDS) > 1:
+        builder.button(text=BTN_ADM_CHANGE_GROUP)
     builder.button(text=BTN_ADMIN_EXIT)
-    builder.adjust(2, 2, 1, 1)
+    if len(config.GROUP_IDS) > 1:
+        builder.adjust(2, 2, 2, 1)
+    else:
+        builder.adjust(2, 2, 1, 1)
     return builder.as_markup(resize_keyboard=True)
+
+
+def get_admin_group_selector_keyboard(
+    groups: List[Tuple[int, str]],
+) -> InlineKeyboardMarkup:
+    """Inline keyboard for selecting a group in admin panel.
+
+    Args:
+        groups: list of (telegram_id, display_name) tuples
+    """
+    builder = InlineKeyboardBuilder()
+    for telegram_id, name in groups:
+        builder.button(text=name, callback_data=f"adm_group:{telegram_id}")
+    builder.adjust(1)
+    return builder.as_markup()
 
 
 def get_admin_sessions_collecting_keyboard() -> ReplyKeyboardMarkup:
