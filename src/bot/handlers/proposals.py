@@ -266,6 +266,11 @@ async def handle_slot_selection(callback: CallbackQuery, state: FSMContext) -> N
         )
         await callback.answer(f"✅ Фильм добавлен в слот {slot}")
 
+        await callback.message.answer(
+            "📝 Предложение принято!",
+            reply_markup=get_main_menu_keyboard(),
+        )
+
     except Exception as e:
         logger.exception("Error handling slot selection: %s", e)
         await callback.answer("❌ Произошла ошибка")
