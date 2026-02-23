@@ -108,7 +108,6 @@ async def propose_movie(
 
     # Best-effort notification to the group
     await notify_movie_proposed(
-        group_telegram_id=session.group.telegram_id,
         movie_title=movie.title,
         movie_type=movie.type,
         slot=movie.slot,

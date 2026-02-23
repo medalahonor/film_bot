@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.dependencies import get_db, get_current_user
 from api.schemas.leaderboard import ClubStats, LeaderboardEntry, LeaderboardResponse
 from api.schemas.movie import MovieResponse
-from bot.database.models import Group, Movie, Rating, Session, SessionStatus, User, Vote
+from bot.database.models import Movie, Rating, Session, SessionStatus, User, Vote
 from bot.database.status_manager import STATUS_COMPLETED
 
 router = APIRouter(prefix="/api/leaderboard", tags=["leaderboard"])
@@ -41,7 +41,6 @@ def _movie_to_response(movie: Movie) -> MovieResponse:
 
 @router.get("", response_model=LeaderboardResponse)
 async def get_leaderboard(
-    group_id: Optional[int] = Query(None, description="Telegram group ID"),
     page: int = Query(1, ge=1),
     search: Optional[str] = Query(None),
     per_page: int = 20,
@@ -59,18 +58,6 @@ async def get_leaderboard(
         .where(Movie.session_id.in_(completed_session_ids_q))
         .where(Movie.club_rating.is_not(None))
     )
-
-    if group_id is not None:
-        group_result = await db.execute(
-            select(Group).where(Group.telegram_id == group_id)
-        )
-        group = group_result.scalar_one_or_none()
-        if group:
-            query = query.where(
-                Movie.session_id.in_(
-                    completed_session_ids_q.where(Session.group_id == group.id)
-                )
-            )
 
     if search:
         query = query.where(Movie.title.ilike(f"%{search}%"))
@@ -118,7 +105,6 @@ async def get_leaderboard(
 
 @router.get("/stats", response_model=ClubStats)
 async def get_club_stats(
-    group_id: Optional[int] = Query(None, description="Telegram group ID"),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> ClubStats:
@@ -127,14 +113,6 @@ async def get_club_stats(
         .join(SessionStatus, Session.status_id == SessionStatus.id)
         .where(SessionStatus.code == STATUS_COMPLETED)
     )
-
-    if group_id is not None:
-        group_result = await db.execute(
-            select(Group).where(Group.telegram_id == group_id)
-        )
-        group = group_result.scalar_one_or_none()
-        if group:
-            completed_ids_q = completed_ids_q.where(Session.group_id == group.id)
 
     total_sessions = (
         await db.execute(select(func.count()).select_from(completed_ids_q.subquery()))

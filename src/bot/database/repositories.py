@@ -11,56 +11,10 @@ from typing import Optional, List, Tuple
 from sqlalchemy import select, func, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.config import config
-from bot.database.models import Group, User, Session, Movie, Rating, Vote
+from bot.database.models import User, Session, Movie, Rating, Vote
 from bot.database.status_manager import get_status_by_code, STATUS_COMPLETED
 
 logger = logging.getLogger(__name__)
-
-
-def resolve_telegram_group_id(
-    chat_id: int,
-    chat_type: str,
-    private_group_id: Optional[int] = None,
-) -> int:
-    """Return the Telegram group ID, mapping private chats to the configured group.
-
-    In private chats (admin), uses ``private_group_id`` if given,
-    otherwise falls back to the first configured group.
-    In group/supergroup chats, the chat_id itself is the group ID.
-    """
-    if chat_type == "private":
-        if private_group_id is not None:
-            return private_group_id
-        return config.GROUP_IDS[0]
-    return chat_id
-
-
-async def get_group_by_telegram_id(
-    db: AsyncSession,
-    telegram_id: int,
-) -> Optional[Group]:
-    """Get a group by its Telegram chat ID."""
-    result = await db.execute(
-        select(Group).where(Group.telegram_id == telegram_id)
-    )
-    return result.scalar_one_or_none()
-
-
-async def get_or_create_group(
-    db: AsyncSession,
-    telegram_id: int,
-    name: Optional[str] = None,
-) -> Group:
-    """Get an existing group or create a new one."""
-    group = await get_group_by_telegram_id(db, telegram_id)
-    if not group:
-        group = Group(telegram_id=telegram_id, name=name)
-        db.add(group)
-        await db.commit()
-        await db.refresh(group)
-        logger.info("Created new group: %d", telegram_id)
-    return group
 
 
 async def get_or_create_user(
@@ -102,25 +56,14 @@ async def get_user_by_username(
 
 async def get_active_session(
     db: AsyncSession,
-    group_id: int,
     status_code: str,
 ) -> Optional[Session]:
-    """Get the most recent session for a group with a specific status.
-
-    Args:
-        db: Database session
-        group_id: Internal group ID (not Telegram chat ID)
-        status_code: Status code to filter by (e.g. STATUS_COLLECTING)
-
-    Returns:
-        Session or None if not found or status not initialized
-    """
+    """Get the most recent session with a specific status (global, no group filter)."""
     status = await get_status_by_code(db, status_code)
     if not status:
         return None
     result = await db.execute(
         select(Session)
-        .where(Session.group_id == group_id)
         .where(Session.status_id == status.id)
         .order_by(Session.created_at.desc())
     )
@@ -129,18 +72,13 @@ async def get_active_session(
 
 async def get_active_session_any(
     db: AsyncSession,
-    group_id: int,
 ) -> Optional[Session]:
-    """Get any active (non-completed) session for a group.
-
-    Returns the most recent non-completed session, or None.
-    """
+    """Get any active (non-completed) session (global, no group filter)."""
     completed_status = await get_status_by_code(db, STATUS_COMPLETED)
     if not completed_status:
         return None
     result = await db.execute(
         select(Session)
-        .where(Session.group_id == group_id)
         .where(Session.status_id != completed_status.id)
         .order_by(Session.created_at.desc())
     )
@@ -302,14 +240,12 @@ async def get_session_movies(
 
 async def create_completed_session_for_import(
     db: AsyncSession,
-    group_id: int,
     created_by_id: int,
 ) -> Session:
     """Create a completed session for batch import."""
     completed_status = await get_status_by_code(db, STATUS_COMPLETED)
     now = datetime.utcnow()
     session = Session(
-        group_id=group_id,
         created_by=created_by_id,
         status_id=completed_status.id,
         created_at=now,

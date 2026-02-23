@@ -13,7 +13,7 @@ import {
   getAdminSessions,
   getAdminUsers,
   getDbStats,
-  getMoviesForSession,
+  getSessionMovies,
   getPendingUsers,
   setSessionWinner,
   updateClubRating,
@@ -86,7 +86,7 @@ const sectionTitle: React.CSSProperties = {
 // Sub-sections
 // ---------------------------------------------------------------------------
 
-const SessionsTab: React.FC<{ groupId: number | null }> = ({ groupId }) => {
+const SessionsTab: React.FC = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
@@ -94,21 +94,20 @@ const SessionsTab: React.FC<{ groupId: number | null }> = ({ groupId }) => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getAdminSessions(groupId ?? undefined);
+      const data = await getAdminSessions();
       setSessions(data);
     } catch {
       setMsg('Ошибка загрузки сессий');
     } finally {
       setLoading(false);
     }
-  }, [groupId]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
   const handleCreate = async () => {
-    if (!groupId) return setMsg('group_id не определён');
     try {
-      await createSession(groupId);
+      await createSession();
       setMsg('Сессия создана');
       load();
     } catch (e: any) {
@@ -223,24 +222,23 @@ const SessionsTab: React.FC<{ groupId: number | null }> = ({ groupId }) => {
 
 // ---------------------------------------------------------------------------
 
-const MoviesTab: React.FC<{ groupId: number | null }> = ({ groupId }) => {
+const MoviesTab: React.FC = () => {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
   const [editRating, setEditRating] = useState<Record<number, string>>({});
 
   const load = useCallback(async () => {
-    if (!groupId) return;
     setLoading(true);
     try {
-      const data = await getMoviesForSession(groupId);
+      const data = await getSessionMovies();
       setMovies(data);
     } catch {
       setMsg('Ошибка загрузки фильмов (нет активной сессии?)');
     } finally {
       setLoading(false);
     }
-  }, [groupId]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -430,7 +428,7 @@ const UsersTab: React.FC = () => {
 
 // ---------------------------------------------------------------------------
 
-const ImportTab: React.FC<{ groupId: number | null }> = ({ groupId }) => {
+const ImportTab: React.FC = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [sessionId, setSessionId] = useState('');
   const [slot, setSlot] = useState('1');
@@ -440,10 +438,10 @@ const ImportTab: React.FC<{ groupId: number | null }> = ({ groupId }) => {
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
-    getAdminSessions(groupId ?? undefined)
+    getAdminSessions()
       .then(setSessions)
       .catch(() => {});
-  }, [groupId]);
+  }, []);
 
   const handleImport = async () => {
     const id = parseInt(sessionId, 10);
@@ -646,7 +644,6 @@ const StatsBar: React.FC = () => {
 
 export const AdminPage: React.FC = () => {
   const isAdmin = useAppStore((s) => s.isAdmin);
-  const groupId = useAppStore((s) => s.groupId);
   const [activeTab, setActiveTab] = useState<AdminTab>('sessions');
 
   if (!isAdmin) {
@@ -708,10 +705,10 @@ export const AdminPage: React.FC = () => {
       </div>
 
       {/* Tab content */}
-      {activeTab === 'sessions' && <SessionsTab groupId={groupId} />}
-      {activeTab === 'movies' && <MoviesTab groupId={groupId} />}
+      {activeTab === 'sessions' && <SessionsTab />}
+      {activeTab === 'movies' && <MoviesTab />}
       {activeTab === 'users' && <UsersTab />}
-      {activeTab === 'import' && <ImportTab groupId={groupId} />}
+      {activeTab === 'import' && <ImportTab />}
       {activeTab === 'logs' && <LogsTab />}
     </div>
   );

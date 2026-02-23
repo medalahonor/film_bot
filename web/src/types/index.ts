@@ -27,7 +27,6 @@ export interface Movie {
 export interface Session {
   id: number;
   status: SessionStatus;
-  group_telegram_id: number;
   created_at: string;
   voting_started_at: string | null;
   completed_at: string | null;

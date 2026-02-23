@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from '../../hooks/useSession';
-import { useAppStore } from '../../store/useAppStore';
 import { useTelegram } from '../../hooks/useTelegram';
 import { StarRating } from '../../components/StarRating';
 import { MovieCardFull } from '../../components/MovieCardFull';
@@ -106,7 +105,6 @@ const MovieRatingCard: React.FC<MovieRatingCardProps> = ({ movie, sessionId }) =
 
 export const RatingPage: React.FC = () => {
   const { session, movies, loading, error, refresh } = useSession();
-  const groupId = useAppStore((s) => s.groupId);
   const [completing, setCompleting] = useState(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
 
@@ -138,14 +136,6 @@ export const RatingPage: React.FC = () => {
     }
     return result;
   }, [session, movies]);
-
-  if (!groupId) {
-    return (
-      <div style={{ padding: 24, textAlign: 'center', color: 'var(--tg-theme-hint-color, #999)' }}>
-        Откройте приложение из группы киноклуба
-      </div>
-    );
-  }
 
   if (loading) return <Loader center size={36} />;
 

@@ -72,8 +72,6 @@ export const useTelegram = () => {
   return {
     tg,
     user: tg?.initDataUnsafe?.user ?? null,
-    chat: tg?.initDataUnsafe?.chat ?? null,
-    startParam: tg?.initDataUnsafe?.start_param ?? null,
     colorScheme: tg?.colorScheme ?? 'light',
     themeParams: tg?.themeParams ?? {},
     openLink: (url: string) => tg?.openLink(url),
@@ -83,8 +81,8 @@ export const useTelegram = () => {
 
 /** Initialize Telegram WebApp and populate global state. Call once in App root. */
 export const useTelegramInit = () => {
-  const { tg, user, chat, startParam } = useTelegram();
-  const { setCurrentUser, setGroupId } = useAppStore();
+  const { tg, user } = useTelegram();
+  const { setCurrentUser } = useAppStore();
 
   useEffect(() => {
     if (tg) {
@@ -94,22 +92,6 @@ export const useTelegramInit = () => {
 
     if (user) {
       setCurrentUser(user);
-    }
-
-    // Priority: URL param > chat.id > start_param encoding
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlGroupId = urlParams.get('group_id');
-
-    if (urlGroupId) {
-      setGroupId(parseInt(urlGroupId, 10));
-    } else if (chat?.id) {
-      setGroupId(chat.id);
-    } else if (startParam) {
-      // Bot passes start_param like "group_-1001234567890"
-      const match = startParam.match(/^group_(-?\d+)$/);
-      if (match) {
-        setGroupId(parseInt(match[1], 10));
-      }
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 };

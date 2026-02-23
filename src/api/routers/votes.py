@@ -248,10 +248,7 @@ async def finalize_votes(
                 m = (await db.execute(select(Movie).where(Movie.id == movie_id))).scalar_one_or_none()
                 if m:
                     winner_titles[slot] = m.title
-        await notify_voting_finalized(
-            group_telegram_id=session.group.telegram_id,
-            winner_titles=winner_titles,
-        )
+        await notify_voting_finalized(winner_titles=winner_titles)
 
     return {
         "winner_slot1_id": session.winner_slot1_id,

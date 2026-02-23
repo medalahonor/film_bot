@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { SearchBar } from '../../components/SearchBar';
 import { MovieCard } from '../../components/MovieCard';
 import { Loader } from '../../components/Loader';
-import { useAppStore } from '../../store/useAppStore';
 import { getLeaderboard, getClubStats } from '../../api/leaderboard';
 import { getErrorMessage } from '../../api/client';
 import type { LeaderboardEntry, ClubStats } from '../../types';
@@ -68,8 +67,6 @@ const StatsBar: React.FC<{ stats: ClubStats }> = ({ stats }) => (
 );
 
 export const LeaderboardPage: React.FC = () => {
-  const groupId = useAppStore((s) => s.groupId);
-
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<LeaderboardEntry[]>([]);
@@ -84,14 +81,14 @@ export const LeaderboardPage: React.FC = () => {
   const loadStats = useCallback(async () => {
     setStatsLoading(true);
     try {
-      const data = await getClubStats(groupId ?? undefined);
+      const data = await getClubStats();
       setStats(data);
     } catch {
       // Stats are optional; swallow error
     } finally {
       setStatsLoading(false);
     }
-  }, [groupId]);
+  }, []);
 
   const loadPage = useCallback(
     async (p: number, q: string) => {
@@ -99,7 +96,6 @@ export const LeaderboardPage: React.FC = () => {
       setError(null);
       try {
         const data = await getLeaderboard({
-          group_id: groupId ?? undefined,
           page: p,
           search: q || undefined,
         });
@@ -112,7 +108,7 @@ export const LeaderboardPage: React.FC = () => {
         setLoading(false);
       }
     },
-    [groupId],
+    [],
   );
 
   useEffect(() => {

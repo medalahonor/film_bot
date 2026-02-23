@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useSession } from '../../hooks/useSession';
 import { useVoting } from '../../hooks/useVoting';
-import { useAppStore } from '../../store/useAppStore';
 import { useTelegram } from '../../hooks/useTelegram';
 import { MovieCard } from '../../components/MovieCard';
 import { MovieCardFull } from '../../components/MovieCardFull';
@@ -152,7 +151,6 @@ const SlotVotePanel: React.FC<SlotVotePanelProps> = ({ slot, movies, sessionId, 
 
 export const VotePage: React.FC = () => {
   const { session, movies, loading, error, refresh } = useSession();
-  const groupId = useAppStore((s) => s.groupId);
   const [activeSlot, setActiveSlot] = useState<1 | 2>(1);
   const [finalizing, setFinalizing] = useState(false);
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
@@ -184,14 +182,6 @@ export const VotePage: React.FC = () => {
       setFinalizing(false);
     }
   };
-
-  if (!groupId) {
-    return (
-      <div style={{ padding: 24, textAlign: 'center', color: 'var(--tg-theme-hint-color, #999)' }}>
-        Откройте приложение из группы киноклуба
-      </div>
-    );
-  }
 
   if (loading) return <Loader center size={36} />;
 

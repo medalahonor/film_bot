@@ -41,7 +41,5 @@ export const replaceMovie = (movieId: number, data: ReplaceMovieRequest): Promis
 export const withdrawMovie = (movieId: number): Promise<void> =>
   client.delete(`/movies/${movieId}`).then(() => undefined);
 
-export const getSessionMovies = (groupId: number): Promise<Movie[]> =>
-  client
-    .get<Movie[]>('/sessions/current/movies', { params: { group_id: groupId } })
-    .then((r) => r.data);
+export const getSessionMovies = (): Promise<Movie[]> =>
+  client.get<Movie[]>('/sessions/current/movies').then((r) => r.data);

@@ -7,7 +7,6 @@ from pydantic import BaseModel
 class SessionResponse(BaseModel):
     id: int
     status: str  # status code: collecting | voting | rating | completed
-    group_telegram_id: int
     created_at: datetime
     voting_started_at: Optional[datetime]
     completed_at: Optional[datetime]

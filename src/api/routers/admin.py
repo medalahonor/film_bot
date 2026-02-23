@@ -11,7 +11,7 @@ from api.dependencies import get_db, get_admin
 from api.schemas.movie import MovieResponse
 from api.schemas.session import SessionResponse
 from api.schemas.user import UserResponse
-from bot.database.models import Group, Movie, Session, User
+from bot.database.models import Movie, Session, User
 from bot.log_handler import get_recent_logs
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -23,7 +23,6 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 @router.get("/users", response_model=List[UserResponse])
 async def list_users(
-    group_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(get_admin),
 ) -> List[UserResponse]:
@@ -108,7 +107,6 @@ def _session_to_response(session: Session) -> SessionResponse:
     return SessionResponse(
         id=session.id,
         status=session.status,
-        group_telegram_id=session.group.telegram_id,
         created_at=session.created_at,
         voting_started_at=session.voting_started_at,
         completed_at=session.completed_at,
@@ -121,17 +119,12 @@ def _session_to_response(session: Session) -> SessionResponse:
 
 @router.get("/sessions", response_model=List[SessionResponse])
 async def list_sessions(
-    group_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(get_admin),
 ) -> List[SessionResponse]:
-    q = select(Session).order_by(Session.created_at.desc())
-    if group_id is not None:
-        group_result = await db.execute(select(Group).where(Group.telegram_id == group_id))
-        group = group_result.scalar_one_or_none()
-        if group:
-            q = q.where(Session.group_id == group.id)
-    sessions = list((await db.execute(q)).scalars().all())
+    sessions = list(
+        (await db.execute(select(Session).order_by(Session.created_at.desc()))).scalars().all()
+    )
     return [_session_to_response(s) for s in sessions]
 
 

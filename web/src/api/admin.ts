@@ -5,10 +5,8 @@ import type { UserResponse, Session, Movie } from '../types';
 // Users
 // ---------------------------------------------------------------------------
 
-export const getAdminUsers = (groupId?: number): Promise<UserResponse[]> =>
-  client
-    .get<UserResponse[]>('/admin/users', { params: { group_id: groupId } })
-    .then((r) => r.data);
+export const getAdminUsers = (): Promise<UserResponse[]> =>
+  client.get<UserResponse[]>('/admin/users').then((r) => r.data);
 
 export const getPendingUsers = (): Promise<UserResponse[]> =>
   client.get<UserResponse[]>('/admin/users/pending').then((r) => r.data);
@@ -33,13 +31,11 @@ export const createUser = (data: CreateUserRequest): Promise<UserResponse> =>
 // Sessions
 // ---------------------------------------------------------------------------
 
-export const getAdminSessions = (groupId?: number): Promise<Session[]> =>
-  client
-    .get<Session[]>('/admin/sessions', { params: { group_id: groupId } })
-    .then((r) => r.data);
+export const getAdminSessions = (): Promise<Session[]> =>
+  client.get<Session[]>('/admin/sessions').then((r) => r.data);
 
-export const createSession = (groupId: number): Promise<Session> =>
-  client.post<Session>('/sessions', { group_id: groupId }).then((r) => r.data);
+export const createSession = (): Promise<Session> =>
+  client.post<Session>('/sessions').then((r) => r.data);
 
 export const changeSessionStatus = (sessionId: number, status: string): Promise<Session> =>
   client
@@ -65,15 +61,8 @@ export const setSessionWinner = (
 // Movies (admin)
 // ---------------------------------------------------------------------------
 
-export const getSessionMovies = (sessionId: number): Promise<Movie[]> =>
-  client
-    .get<Movie[]>('/sessions/current/movies', { params: { group_id: undefined } })
-    .then((r) => r.data);
-
-export const getMoviesForSession = (groupId: number): Promise<Movie[]> =>
-  client
-    .get<Movie[]>('/sessions/current/movies', { params: { group_id: groupId } })
-    .then((r) => r.data);
+export const getSessionMovies = (): Promise<Movie[]> =>
+  client.get<Movie[]>('/sessions/current/movies').then((r) => r.data);
 
 export const deleteMovie = (movieId: number): Promise<void> =>
   client.delete(`/movies/${movieId}`).then(() => undefined);

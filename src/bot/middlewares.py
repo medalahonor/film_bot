@@ -48,39 +48,17 @@ class AccessCheckMiddleware(BaseMiddleware):
             thread_id,
         )
 
-        # Check for group/supergroup chats
+        # Group/supergroup chats — allow all
         if chat_type in ['group', 'supergroup']:
-            if chat.id not in config.GROUP_IDS:
-                logger.warning(
-                    "Rejected: unauthorized group chat_id=%d user_id=%d",
-                    chat.id,
-                    user_id,
-                )
-                if isinstance(event, Message):
-                    await event.answer(
-                        "❌ Бот работает только в авторизованной группе."
-                    )
-                return None
-
-            # Check topic restriction for supergroups
-            if not self._isAllowedTopic(event, chat_type, chat.id):
-                logger.info(
-                    "Rejected: topic not allowed user_id=%d topic_id=%s",
-                    user_id,
-                    thread_id,
-                )
-                return None
-
-            # Authorized group - proceed
             return await handler(event, data)
-        
-        # Private chats are allowed for all users
+
+        # Private chats — allow all, mark admins
         elif chat_type == 'private':
             if user_id in config.ADMIN_IDS:
                 data['is_admin'] = True
             return await handler(event, data)
-        
-        # Unknown chat type
+
+        # Unknown chat type — ignore
         logger.warning(
             "Rejected: unknown chat_type=%s chat_id=%d user_id=%d",
             chat_type,
@@ -88,42 +66,6 @@ class AccessCheckMiddleware(BaseMiddleware):
             user_id,
         )
         return None
-
-    @staticmethod
-    def _isAllowedTopic(
-        event: Message | CallbackQuery,
-        chat_type: str,
-        chat_id: int,
-    ) -> bool:
-        """Check if the event comes from an allowed topic.
-
-        Rules:
-        - No topic configured for this group → no restriction.
-        - Chat is a regular group (not supergroup) → no restriction.
-        - Supergroup without forum topics → no restriction.
-        - Supergroup with forum topics → allow only configured topic ID.
-        """
-        topic_id = config.GROUP_TOPIC_MAP.get(chat_id)
-        if topic_id is None:
-            return True
-
-        if chat_type != "supergroup":
-            return True
-
-        thread_id = _extractThreadId(event)
-        if thread_id is None:
-            return True
-
-        is_allowed = thread_id == topic_id
-        if not is_allowed:
-            logger.debug(
-                "Blocked event in topic %d (allowed: %s for group %d)",
-                thread_id,
-                topic_id,
-                chat_id,
-            )
-        return is_allowed
-
 
 class PollAnswerLoggingMiddleware(BaseMiddleware):
     """Middleware to log PollAnswer events.

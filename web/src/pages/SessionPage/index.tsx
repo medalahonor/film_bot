@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import { useSession } from '../../hooks/useSession';
-import { useAppStore } from '../../store/useAppStore';
 import { Loader } from '../../components/Loader';
 import { MovieCard } from '../../components/MovieCard';
 import type { Movie, SessionStatus } from '../../types';
@@ -81,7 +80,6 @@ const Divider: React.FC = () => (
 );
 
 export const SessionPage: React.FC = () => {
-  const groupId = useAppStore((s) => s.groupId);
   const { session, movies, loading, error, refresh } = useSession();
 
   const slot1Movies = useMemo(
@@ -92,28 +90,6 @@ export const SessionPage: React.FC = () => {
     () => movies.filter((m) => m.slot === 2),
     [movies],
   );
-
-  if (!groupId) {
-    return (
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
-          padding: 24,
-          textAlign: 'center',
-          gap: 12,
-        }}
-      >
-        <div style={{ fontSize: 48 }}>👋</div>
-        <p style={{ fontSize: 15, color: 'var(--tg-theme-hint-color, #999)' }}>
-          Откройте приложение из группы киноклуба
-        </p>
-      </div>
-    );
-  }
 
   if (loading) {
     return <Loader center size={36} />;

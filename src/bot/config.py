@@ -55,8 +55,6 @@ class Config:
         """Validate configuration."""
         if not cls.BOT_TOKEN:
             raise ValueError("TELEGRAM_BOT_TOKEN is not set")
-        if not cls.GROUP_IDS:
-            raise ValueError("TELEGRAM_GROUP_IDS is not set or empty")
         if not cls.ADMIN_IDS:
             raise ValueError("TELEGRAM_ADMIN_IDS is not set")
         if not cls.DATABASE_URL:

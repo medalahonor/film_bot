@@ -13,7 +13,6 @@ interface UseSessionResult {
 }
 
 export const useSession = (): UseSessionResult => {
-  const groupId = useAppStore((s) => s.groupId);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
 
   const [session, setSession] = useState<Session | null>(null);
@@ -22,16 +21,12 @@ export const useSession = (): UseSessionResult => {
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!groupId) {
-      setError('Группа не определена. Откройте приложение из группы.');
-      return;
-    }
     setLoading(true);
     setError(null);
     try {
       const [sess, movs] = await Promise.all([
-        getCurrentSession(groupId),
-        getSessionMovies(groupId),
+        getCurrentSession(),
+        getSessionMovies(),
       ]);
       setSession(sess);
       setCurrentSession(sess);
@@ -41,7 +36,7 @@ export const useSession = (): UseSessionResult => {
     } finally {
       setLoading(false);
     }
-  }, [groupId, setCurrentSession]);
+  }, [setCurrentSession]);
 
   useEffect(() => {
     refresh();

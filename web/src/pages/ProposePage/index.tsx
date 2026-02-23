@@ -28,7 +28,6 @@ export const ProposePage: React.FC = () => {
   const [myMovies, setMyMovies] = useState<{ 1?: Movie; 2?: Movie }>({});
   const [withdrawing, setWithdrawing] = useState<number | null>(null);
 
-  const groupId = useAppStore((s) => s.groupId);
   const currentSession = useAppStore((s) => s.currentSession);
   const { tg, haptic } = useTelegram();
   const myTelegramId = tg?.initDataUnsafe?.user?.id ?? null;
@@ -51,9 +50,9 @@ export const ProposePage: React.FC = () => {
   } = useMovieDetail();
 
   const loadMyMovies = useCallback(async () => {
-    if (!currentSession || !groupId || !myTelegramId) return;
+    if (!currentSession || !myTelegramId) return;
     try {
-      const movies = await getSessionMovies(groupId);
+      const movies = await getSessionMovies();
       const mine: { 1?: Movie; 2?: Movie } = {};
       movies.forEach((m) => {
         if (m.proposer_telegram_id === myTelegramId) {
@@ -64,7 +63,7 @@ export const ProposePage: React.FC = () => {
     } catch {
       // ignore — not critical
     }
-  }, [currentSession?.id, groupId, myTelegramId]);
+  }, [currentSession?.id, myTelegramId]);
 
   useEffect(() => {
     loadMyMovies();

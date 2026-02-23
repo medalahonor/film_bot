@@ -24,7 +24,7 @@ async def cmd_start(message: Message) -> None:
 
     if message.chat.type != "private":
         await message.answer(
-            "🎬 <b>Киноклуб</b>\n\nНажмите кнопку, чтобы открыть приложение.",
+            "🎬 Откройте приложение из группы киноклуба",
             reply_markup=get_group_open_keyboard(),
             parse_mode="HTML",
         )

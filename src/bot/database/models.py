@@ -53,22 +53,6 @@ class User(Base):
         return f"<User(id={self.id}, username={self.username})>"
 
 
-class Group(Base):
-    """Group model - authorized Telegram groups."""
-    __tablename__ = "groups"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
-    name: Mapped[Optional[str]] = mapped_column(String(255))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-    # Relationships
-    sessions: Mapped[List["Session"]] = relationship("Session", back_populates="group", lazy="selectin")
-
-    def __repr__(self) -> str:
-        return f"<Group(id={self.id}, name={self.name})>"
-
-
 class Admin(Base):
     """Admin model - bot administrators."""
     __tablename__ = "admins"
@@ -87,7 +71,6 @@ class Session(Base):
     __tablename__ = "sessions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), nullable=False)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     status_id: Mapped[int] = mapped_column(
         ForeignKey("session_statuses.id"), 
@@ -112,7 +95,6 @@ class Session(Base):
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     # Relationships
-    group: Mapped["Group"] = relationship("Group", back_populates="sessions", lazy="selectin")
     creator: Mapped["User"] = relationship("User", back_populates="sessions", lazy="selectin")
     status_obj: Mapped["SessionStatus"] = relationship("SessionStatus", back_populates="sessions", lazy="selectin")
     movies: Mapped[List["Movie"]] = relationship(

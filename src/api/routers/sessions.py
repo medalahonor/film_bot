@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,7 +11,7 @@ from api.dependencies import get_db, get_current_user
 from api.schemas.movie import MovieResponse
 from api.schemas.session import SessionResponse
 from api.telegram_notify import notify_session_status_changed
-from bot.database.models import Group, Movie, Session, SessionStatus, User
+from bot.database.models import Movie, Session, SessionStatus, User
 from bot.database.status_manager import STATUS_COLLECTING, STATUS_COMPLETED
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
@@ -45,7 +45,6 @@ def _session_to_response(session: Session) -> SessionResponse:
     return SessionResponse(
         id=session.id,
         status=session.status,
-        group_telegram_id=session.group.telegram_id,
         created_at=session.created_at,
         voting_started_at=session.voting_started_at,
         completed_at=session.completed_at,
@@ -56,29 +55,15 @@ def _session_to_response(session: Session) -> SessionResponse:
     )
 
 
-async def _resolve_group(db: AsyncSession, group_telegram_id: int) -> Group:
-    result = await db.execute(
-        select(Group).where(Group.telegram_id == group_telegram_id)
-    )
-    group = result.scalar_one_or_none()
-    if not group:
-        raise HTTPException(status_code=404, detail="Group not found")
-    return group
-
-
-async def _get_active_session(db: AsyncSession, group_id: int) -> Session:
-    """Get the most recent non-completed session for a group."""
+async def _get_active_session(db: AsyncSession) -> Session:
+    """Get the most recent non-completed session (global)."""
     completed_id = (
         await db.execute(
             select(SessionStatus.id).where(SessionStatus.code == STATUS_COMPLETED)
         )
     ).scalar()
 
-    q = (
-        select(Session)
-        .where(Session.group_id == group_id)
-        .order_by(Session.created_at.desc())
-    )
+    q = select(Session).order_by(Session.created_at.desc())
     if completed_id is not None:
         q = q.where(Session.status_id != completed_id)
 
@@ -90,23 +75,19 @@ async def _get_active_session(db: AsyncSession, group_id: int) -> Session:
 
 @router.get("/current", response_model=SessionResponse)
 async def get_current_session(
-    group_id: int = Query(..., description="Telegram group ID"),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> SessionResponse:
-    group = await _resolve_group(db, group_id)
-    session = await _get_active_session(db, group.id)
+    session = await _get_active_session(db)
     return _session_to_response(session)
 
 
 @router.get("/current/movies", response_model=List[MovieResponse])
 async def get_current_session_movies(
-    group_id: int = Query(..., description="Telegram group ID"),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> List[MovieResponse]:
-    group = await _resolve_group(db, group_id)
-    session = await _get_active_session(db, group.id)
+    session = await _get_active_session(db)
 
     movies = list(
         (await db.execute(
@@ -124,17 +105,10 @@ async def get_current_session_movies(
 
 @router.post("", response_model=SessionResponse, status_code=201)
 async def create_session(
-    body: dict,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> SessionResponse:
-    """Create a new collecting session for a group."""
-    group_telegram_id: Optional[int] = body.get("group_id")
-    if not group_telegram_id:
-        raise HTTPException(status_code=422, detail="group_id is required")
-
-    group = await _resolve_group(db, group_telegram_id)
-
+    """Create a new global collecting session."""
     collecting_status = (
         await db.execute(select(SessionStatus).where(SessionStatus.code == STATUS_COLLECTING))
     ).scalar_one_or_none()
@@ -142,7 +116,6 @@ async def create_session(
         raise HTTPException(status_code=500, detail="Session statuses not initialised")
 
     session = Session(
-        group_id=group.id,
         created_by=user.id,
         status_id=collecting_status.id,
     )
@@ -182,10 +155,7 @@ async def change_session_status(
     await db.commit()
     await db.refresh(session)
 
-    await notify_session_status_changed(
-        group_telegram_id=session.group.telegram_id,
-        new_status=new_status_code,
-    )
+    await notify_session_status_changed(new_status=new_status_code)
 
     return _session_to_response(session)
 
