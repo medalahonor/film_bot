@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import { useAppStore } from '../store/useAppStore';
 import { getCurrentSession, getSessionMovies } from '../api/sessions';
 import { getErrorMessage } from '../api/client';
@@ -24,13 +25,18 @@ export const useSession = (): UseSessionResult => {
     setLoading(true);
     setError(null);
     try {
-      const [sess, movs] = await Promise.all([
-        getCurrentSession(),
-        getSessionMovies(),
-      ]);
+      const sess = await getCurrentSession().catch((e) => {
+        if (axios.isAxiosError(e) && e.response?.status === 404) return null;
+        throw e;
+      });
       setSession(sess);
       setCurrentSession(sess);
-      setMovies(movs);
+      if (sess) {
+        const movs = await getSessionMovies();
+        setMovies(movs);
+      } else {
+        setMovies([]);
+      }
     } catch (e) {
       setError(getErrorMessage(e));
     } finally {

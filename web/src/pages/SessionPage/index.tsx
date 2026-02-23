@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useSession } from '../../hooks/useSession';
+import { createSession } from '../../api/admin';
 import { Loader } from '../../components/Loader';
 import { MovieCard } from '../../components/MovieCard';
 import type { Movie, SessionStatus } from '../../types';
@@ -81,6 +82,17 @@ const Divider: React.FC = () => (
 
 export const SessionPage: React.FC = () => {
   const { session, movies, loading, error, refresh } = useSession();
+  const [creating, setCreating] = useState(false);
+
+  const handleCreateSession = useCallback(async () => {
+    setCreating(true);
+    try {
+      await createSession();
+      await refresh();
+    } finally {
+      setCreating(false);
+    }
+  }, [refresh]);
 
   const slot1Movies = useMemo(
     () => movies.filter((m) => m.slot === 1),
@@ -183,10 +195,31 @@ export const SessionPage: React.FC = () => {
             padding: 32,
             textAlign: 'center',
             color: 'var(--tg-theme-hint-color, #999)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 16,
           }}
         >
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🎞️</div>
+          <div style={{ fontSize: 48 }}>🎞️</div>
           <p style={{ fontSize: 15, margin: 0 }}>Активных сессий нет</p>
+          <button
+              onClick={handleCreateSession}
+              disabled={creating}
+              style={{
+                padding: '10px 24px',
+                backgroundColor: 'var(--tg-theme-button-color, #2481cc)',
+                color: 'var(--tg-theme-button-text-color, #fff)',
+                border: 'none',
+                borderRadius: 8,
+                fontSize: 15,
+                cursor: 'pointer',
+                fontWeight: 500,
+                opacity: creating ? 0.7 : 1,
+              }}
+            >
+              {creating ? 'Создаём…' : '+ Создать сессию'}
+            </button>
         </div>
       )}
 
