@@ -31,6 +31,9 @@ class Config:
     # WebApp URL (used for the inline WebApp button in /start)
     WEBAPP_URL: str = os.getenv("WEBAPP_URL", "")
 
+    # Bot t.me URL for group chats (e.g. https://t.me/mybot or https://t.me/mybot/appname)
+    BOT_URL: str = os.getenv("BOT_URL", "")
+
     @classmethod
     def _parse_groups(cls) -> None:
         """Parse TELEGRAM_GROUP_IDS into GROUP_IDS and GROUP_TOPIC_MAP."""

@@ -74,20 +74,10 @@ class AccessCheckMiddleware(BaseMiddleware):
             # Authorized group - proceed
             return await handler(event, data)
         
-        # Check for private chats (only admins allowed)
+        # Private chats are allowed for all users
         elif chat_type == 'private':
-            if user_id not in config.ADMIN_IDS:
-                logger.warning(
-                    "Rejected: non-admin private chat user_id=%d",
-                    user_id,
-                )
-                if isinstance(event, Message):
-                    await event.answer(
-                        "❌ Личные сообщения доступны только администраторам."
-                    )
-                return None
-            # Authorized admin - proceed
-            data['is_admin'] = True
+            if user_id in config.ADMIN_IDS:
+                data['is_admin'] = True
             return await handler(event, data)
         
         # Unknown chat type

@@ -28,6 +28,7 @@ services:
       TELEGRAM_GROUP_IDS: ${TELEGRAM_GROUP_IDS}
       TELEGRAM_ADMIN_IDS: ${TELEGRAM_ADMIN_IDS}
       DATABASE_URL: postgresql+asyncpg://filmbot:${DB_PASSWORD}@db:5432/filmbot
+      BOT_URL: ${BOT_URL:-}
     volumes:
       - ./src/bot:/app/src/bot
       - ./src/alembic:/app/src/alembic
