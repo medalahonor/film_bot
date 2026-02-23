@@ -104,7 +104,11 @@ echo "=== Настройка авторенивала сертификата ===
 DOCKER_BIN=$(command -v docker)
 CRON_LINE="0 3 * * * certbot renew --quiet && $DOCKER_BIN compose -f $PROJECT_DIR/docker-compose.yml exec -T nginx nginx -s reload"
 
-if ! crontab -l 2>/dev/null | grep -qF "$PROJECT_DIR/docker-compose.yml"; then
+if ! command -v crontab &>/dev/null; then
+    echo "WARN: crontab не найден — авторенивал не настроен."
+    echo "      Установите cron (apt-get install -y cron) и добавьте вручную:"
+    echo "      $CRON_LINE"
+elif ! crontab -l 2>/dev/null | grep -qF "$PROJECT_DIR/docker-compose.yml"; then
     (crontab -l 2>/dev/null; echo "$CRON_LINE") | crontab -
     echo "Cron добавлен: авторенивал ежедневно в 03:00"
 else
