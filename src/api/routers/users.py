@@ -2,11 +2,23 @@
 from typing import Optional
 
 import aiohttp
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Depends, Response
 
 from api.config import config
+from api.dependencies import get_current_user
+from bot.database.models import User
 
 router = APIRouter(prefix="/api/users", tags=["users"])
+
+
+@router.get("/me")
+async def get_me(user: User = Depends(get_current_user)) -> dict:
+    """Return current user's profile including admin status."""
+    return {
+        "telegram_id": user.telegram_id,
+        "is_admin": user.telegram_id in config.telegram_admin_ids,
+        "is_allowed": user.is_allowed,
+    }
 
 # Simple in-memory cache: {telegram_id: bytes | None}
 # None means "no photo"; refreshes on restart.

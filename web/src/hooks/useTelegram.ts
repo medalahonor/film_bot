@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { getMe } from '../api/users';
 
 // Extend window with Telegram WebApp types
 declare global {
@@ -82,7 +83,7 @@ export const useTelegram = () => {
 /** Initialize Telegram WebApp and populate global state. Call once in App root. */
 export const useTelegramInit = () => {
   const { tg, user } = useTelegram();
-  const { setCurrentUser } = useAppStore();
+  const { setCurrentUser, setIsAdmin } = useAppStore();
 
   useEffect(() => {
     if (tg) {
@@ -93,5 +94,9 @@ export const useTelegramInit = () => {
     if (user) {
       setCurrentUser(user);
     }
+
+    getMe()
+      .then(({ is_admin }) => setIsAdmin(is_admin))
+      .catch(() => {}); // 403 → filmbot:access-denied event handles it
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 };
