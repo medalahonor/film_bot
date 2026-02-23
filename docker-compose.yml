@@ -33,5 +33,38 @@ services:
       - ./src/alembic:/app/src/alembic
     restart: unless-stopped
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_ADMIN_IDS: ${TELEGRAM_ADMIN_IDS}
+      DATABASE_URL: postgresql+asyncpg://filmbot:${DB_PASSWORD}@db:5432/filmbot
+      WEBAPP_ORIGIN: https://${DOMAIN:-localhost}
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+
 volumes:
   postgres_data:

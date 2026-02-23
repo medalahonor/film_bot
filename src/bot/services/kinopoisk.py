@@ -5,11 +5,10 @@ Uses Kinopoisk GraphQL API (graphql.kinopoisk.ru) for fast, structured data retr
 import json
 import re
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from urllib.parse import urlparse
 
 import aiohttp
-from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +37,8 @@ GRAPHQL_HEADERS = {
 from bot.services._graphql_queries import (
     FILM_BASE_INFO_QUERY,
     FILM_BASE_INFO_VARIABLES_TEMPLATE,
+    SUGGEST_SEARCH_QUERY,
+    SUGGEST_SEARCH_URL,
 )
 
 # Poster size suffix for avatarsUrl
@@ -45,6 +46,9 @@ _POSTER_SIZE = "300x450"
 
 # Timeout for HTTP requests (seconds)
 _HTTP_TIMEOUT = 15
+
+# __typename values that indicate a serial
+_SERIAL_TYPENAMES = ('TvSeries', 'TvShow', 'MiniSeries')
 
 # ── Exceptions ───────────────────────────────────────────────────────────
 
@@ -57,13 +61,11 @@ class KinopoiskParserError(Exception):
 
 
 def extract_kinopoisk_id(url: str) -> Optional[str]:
-    """Extract Kinopoisk film ID from URL.
+    """Extract Kinopoisk film/serial ID from URL.
 
-    Examples:
-        https://www.kinopoisk.ru/film/301/ -> 301
-        https://www.kinopoisk.ru/film/301/cast/ -> 301
+    Supports both /film/<id>/ and /series/<id>/ formats.
     """
-    pattern = r'kinopoisk\.ru/film/(\d+)'
+    pattern = r'kinopoisk\.ru/(?:film|series)/(\d+)'
     match = re.search(pattern, url)
     if match:
         return match.group(1)
@@ -71,12 +73,12 @@ def extract_kinopoisk_id(url: str) -> Optional[str]:
 
 
 def is_valid_kinopoisk_url(url: str) -> bool:
-    """Check if URL is a valid Kinopoisk film URL."""
+    """Check if URL is a valid Kinopoisk film or serial URL."""
     try:
         parsed = urlparse(url)
         if 'kinopoisk.ru' not in parsed.netloc:
             return False
-        if '/film/' not in parsed.path:
+        if '/film/' not in parsed.path and '/series/' not in parsed.path:
             return False
         return extract_kinopoisk_id(url) is not None
     except (ValueError, AttributeError):
@@ -87,12 +89,7 @@ def is_valid_kinopoisk_url(url: str) -> bool:
 
 
 def _build_poster_url(avatars_url: Optional[str], fallback_url: Optional[str]) -> Optional[str]:
-    """Build full poster URL from GraphQL response fields.
-
-    avatarsUrl is a base like //avatars.mds.yandex.net/get-kinopoisk-image/...
-    We prepend https: and append the size suffix.
-    fallbackUrl is used as-is if avatarsUrl is missing.
-    """
+    """Build full poster URL from GraphQL response fields."""
     if avatars_url:
         base = avatars_url.rstrip('/')
         if base.startswith('//'):
@@ -100,6 +97,29 @@ def _build_poster_url(avatars_url: Optional[str], fallback_url: Optional[str]) -
         return f"{base}/{_POSTER_SIZE}"
     if fallback_url:
         return fallback_url
+    return None
+
+
+def _determine_type(typename: Optional[str]) -> str:
+    """Map GraphQL __typename to 'film' or 'serial'."""
+    if typename in _SERIAL_TYPENAMES:
+        return 'serial'
+    return 'film'
+
+
+def _extract_year_for_serial(film: Dict[str, Any]) -> Optional[int]:
+    """Extract start year from releaseYears for serials."""
+    release_years = film.get('releaseYears') or []
+    if release_years:
+        return release_years[0].get('start')
+    return None
+
+
+def _extract_year_end(film: Dict[str, Any]) -> Optional[int]:
+    """Extract end year from releaseYears (last element) for serials."""
+    release_years = film.get('releaseYears') or []
+    if release_years:
+        return release_years[-1].get('end')
     return None
 
 
@@ -118,8 +138,17 @@ def _parse_graphql_response(data: Dict[str, Any], kinopoisk_id: str) -> Dict[str
     if not title:
         raise KinopoiskParserError("Не удалось извлечь название фильма")
 
-    # Year
+    # Type from __typename
+    typename = film.get('__typename')
+    content_type = _determine_type(typename)
+
+    # Year: productionYear for films, releaseYears[0].start for serials
     year = film.get("productionYear")
+    if year is None and content_type == 'serial':
+        year = _extract_year_for_serial(film)
+
+    # Year end (for completed serials)
+    year_end = _extract_year_end(film) if content_type == 'serial' else None
 
     # Genres
     genres_list = film.get("genres") or []
@@ -129,7 +158,7 @@ def _parse_graphql_response(data: Dict[str, Any], kinopoisk_id: str) -> Dict[str
     # Description (prefer shortDescription, fallback to synopsis)
     description = film.get("shortDescription") or film.get("synopsis")
 
-    # Poster URL (full query returns kpVertical / marketingVertical aliases)
+    # Poster URL
     gallery = film.get("gallery") or {}
     posters = gallery.get("posters") or {}
     vertical = (
@@ -168,6 +197,8 @@ def _parse_graphql_response(data: Dict[str, Any], kinopoisk_id: str) -> Dict[str
         'kinopoisk_url': normalized_url,
         'title': title,
         'year': year,
+        'year_end': year_end,
+        'type': content_type,
         'genres': genres_str,
         'description': description,
         'poster_url': poster_url,
@@ -176,12 +207,54 @@ def _parse_graphql_response(data: Dict[str, Any], kinopoisk_id: str) -> Dict[str
     }
 
 
-async def _fetch_movie_via_graphql(kinopoisk_id: str) -> Dict[str, Any]:
-    """Fetch movie data from Kinopoisk GraphQL API.
+def _parse_suggest_movie(movie: Dict[str, Any]) -> Dict[str, Any]:
+    """Parse a single movie object from SuggestSearch response."""
+    typename = movie.get('__typename')
+    content_type = _determine_type(typename)
 
-    Raises:
-        KinopoiskParserError: On any failure.
-    """
+    title_data = movie.get('title') or {}
+    title = title_data.get('russian') or title_data.get('original') or ''
+
+    kinopoisk_id = str(movie.get('id', ''))
+
+    # Year
+    year: Optional[int] = movie.get('productionYear')
+    year_end: Optional[int] = None
+    if content_type == 'serial':
+        year = _extract_year_for_serial(movie)
+        year_end = _extract_year_end(movie)
+
+    # Rating
+    kp_rating: Optional[float] = None
+    rating_value = (movie.get('rating') or {}).get('kinopoisk', {}).get('value')
+    if rating_value is not None:
+        try:
+            kp_rating = float(rating_value)
+        except (ValueError, TypeError):
+            pass
+
+    # Poster
+    gallery = movie.get('gallery') or {}
+    posters = gallery.get('posters') or {}
+    vertical = posters.get('vertical') or {}
+    poster_url = _build_poster_url(
+        vertical.get('avatarsUrl'),
+        vertical.get('fallbackUrl'),
+    )
+
+    return {
+        'kinopoisk_id': kinopoisk_id,
+        'title': title,
+        'year': year,
+        'year_end': year_end,
+        'type': content_type,
+        'poster_url': poster_url,
+        'kp_rating': kp_rating,
+    }
+
+
+async def _fetch_movie_via_graphql(kinopoisk_id: str) -> Dict[str, Any]:
+    """Fetch movie data from Kinopoisk GraphQL API."""
     film_id = int(kinopoisk_id)
     variables = {**FILM_BASE_INFO_VARIABLES_TEMPLATE, "filmId": film_id}
     payload = {
@@ -209,18 +282,13 @@ async def _fetch_movie_via_graphql(kinopoisk_id: str) -> Dict[str, Any]:
                 if "errors" in body and not body.get("data"):
                     errors_text = json.dumps(body["errors"], ensure_ascii=False)[:300]
                     logger.error("GraphQL errors: %s", errors_text)
-                    raise KinopoiskParserError(
-                        "Ошибка GraphQL Кинопоиска"
-                    )
+                    raise KinopoiskParserError("Ошибка GraphQL Кинопоиска")
 
                 data = body.get("data")
                 if not data:
-                    raise KinopoiskParserError(
-                        "Пустой ответ от GraphQL Кинопоиска"
-                    )
+                    raise KinopoiskParserError("Пустой ответ от GraphQL Кинопоиска")
 
-                result = _parse_graphql_response(data, kinopoisk_id)
-                return result
+                return _parse_graphql_response(data, kinopoisk_id)
 
     except KinopoiskParserError:
         raise
@@ -235,14 +303,7 @@ async def _fetch_movie_via_graphql(kinopoisk_id: str) -> Dict[str, Any]:
 
 
 async def parse_movie_data(url: str) -> Dict[str, Any]:
-    """Parse movie data from Kinopoisk URL via GraphQL API.
-
-    Returns:
-        Dictionary with movie data
-
-    Raises:
-        KinopoiskParserError: If parsing fails
-    """
+    """Parse movie/serial data from Kinopoisk URL via GraphQL API."""
     if not is_valid_kinopoisk_url(url):
         raise KinopoiskParserError("Неверный URL Кинопоиска")
 
@@ -255,6 +316,62 @@ async def parse_movie_data(url: str) -> Dict[str, Any]:
     return result
 
 
+async def get_movie_by_id(kinopoisk_id: str) -> Dict[str, Any]:
+    """Fetch full movie/serial data by Kinopoisk ID (without URL)."""
+    result = await _fetch_movie_via_graphql(kinopoisk_id)
+    logger.info("Movie '%s' fetched by ID %s", result.get('title'), kinopoisk_id)
+    return result
+
+
+async def suggest_search(query: str, limit: int = 3) -> List[Dict[str, Any]]:
+    """Search movies and serials via SuggestSearch GraphQL.
+
+    Returns list of dicts: [{kinopoisk_id, title, year, year_end, poster_url, kp_rating, type}]
+    """
+    payload = {
+        "operationName": "SuggestSearch",
+        "variables": {"queryText": query, "isAuthorized": False, "limit": limit},
+        "query": SUGGEST_SEARCH_QUERY,
+    }
+
+    try:
+        async with aiohttp.ClientSession(headers=GRAPHQL_HEADERS) as session:
+            async with session.post(
+                SUGGEST_SEARCH_URL,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=_HTTP_TIMEOUT),
+            ) as response:
+                if response.status != 200:
+                    body_text = (await response.text())[:300]
+                    logger.error("SuggestSearch HTTP %d: %s", response.status, body_text)
+                    raise KinopoiskParserError(f"Кинопоиск вернул HTTP {response.status}")
+
+                body = await response.json()
+                movies_raw = (
+                    body.get("data", {})
+                    .get("suggest", {})
+                    .get("top", {})
+                    .get("movies", [])
+                )
+
+                results = []
+                for item in movies_raw:
+                    movie = item.get("movie") if isinstance(item, dict) else item
+                    if not movie or not movie.get("id"):
+                        continue
+                    results.append(_parse_suggest_movie(movie))
+                    if len(results) >= limit:
+                        break
+
+                return results
+
+    except KinopoiskParserError:
+        raise
+    except Exception as exc:
+        logger.error("SuggestSearch failed: %s", exc)
+        raise KinopoiskParserError("Поиск на Кинопоиске недоступен") from exc
+
+
 async def format_movie_info(movie_data: Dict[str, Any]) -> str:
     """Format movie data for Telegram message display."""
     title = movie_data.get('title', 'Без названия')
@@ -263,10 +380,16 @@ async def format_movie_info(movie_data: Dict[str, Any]) -> str:
     rating = movie_data.get('kinopoisk_rating')
     description = movie_data.get('description')
     trailer_url = movie_data.get('trailer_url')
+    content_type = movie_data.get('type', 'film')
 
-    header_parts = [f"🎬 <b>{title}</b>"]
+    type_emoji = '📺' if content_type == 'serial' else '🎬'
+    header_parts = [f"{type_emoji} <b>{title}</b>"]
     if year:
-        header_parts.append(f"({year})")
+        year_end = movie_data.get('year_end')
+        if year_end and year_end != year:
+            header_parts.append(f"({year}–{year_end})")
+        else:
+            header_parts.append(f"({year})")
 
     lines = [' '.join(header_parts)]
 

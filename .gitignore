@@ -24,6 +24,10 @@ wheels/
 .installed.cfg
 *.egg
 
+# Node.js
+node_modules/
+dist/
+
 # Environment
 .env
 

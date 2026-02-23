@@ -1,4 +1,19 @@
-.PHONY: up down restart update logs status build clean
+.PHONY: up down restart update logs status build clean \
+        setup build-web reload-nginx logs-nginx logs-api
+
+# ── Первоначальный деплой ─────────────────────────────────────────────────────
+
+# Первый деплой: валидация .env, SSL-сертификат, сборка образов, запуск сервисов
+setup:
+	sudo bash scripts/setup.sh
+
+# ── Обновление ────────────────────────────────────────────────────────────────
+
+# Обновление: git pull + пересборка образов (включая фронт) + рестарт контейнеров
+update:
+	bash scripts/update.sh
+
+# ── Управление сервисами ──────────────────────────────────────────────────────
 
 # Запуск всех сервисов
 up:
@@ -8,32 +23,51 @@ up:
 down:
 	docker compose down
 
-# Перезапуск с пересозданием контейнера (подхватывает новый образ и volume-изменения)
+# Перезапуск с пересозданием контейнера бота
 restart:
 	docker compose up -d --force-recreate bot
 
-# Полное обновление: pull + пересборка + перезапуск
-update:
-	git pull
-	docker compose up -d --build
+# ── Сборка ────────────────────────────────────────────────────────────────────
 
-# Просмотр логов (Ctrl+C для выхода)
+# Пересборка nginx-образа (включает сборку React SPA внутри Docker)
+build-web:
+	docker compose build nginx
+
+# Пересборка docker-образов без запуска
+build:
+	docker compose build
+
+# ── nginx ─────────────────────────────────────────────────────────────────────
+
+# Перезагрузить конфиг nginx без рестарта контейнера
+reload-nginx:
+	docker compose exec nginx nginx -s reload
+
+# ── Логи ──────────────────────────────────────────────────────────────────────
+
+# Логи всех сервисов (Ctrl+C для выхода)
 logs:
 	docker compose logs -f
 
-# Логи только бота
+# Логи бота
 logs-bot:
 	docker compose logs -f bot
+
+# Логи API
+logs-api:
+	docker compose logs -f api
+
+# Логи nginx
+logs-nginx:
+	docker compose logs -f nginx
+
+# ── Статус и очистка ──────────────────────────────────────────────────────────
 
 # Статус контейнеров
 status:
 	docker compose ps
 
-# Пересборка образа без запуска
-build:
-	docker compose build
-
-# Полная очистка (контейнеры + образы, БД сохраняется)
+# Удаление контейнеров и образов (данные БД сохраняются)
 clean:
 	docker compose down --rmi local
 

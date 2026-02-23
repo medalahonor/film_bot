@@ -1,162 +1,172 @@
-# 🎬 Film Club Telegram Bot
+# Film Club Telegram Bot
 
-Телеграм-бот для автоматизации проведения киноклуба: сбор предложений фильмов, голосование, рейтинговая система и таблица лидеров.
+Телеграм-бот для автоматизации проведения киноклуба: сбор предложений фильмов, голосование, рейтинговая система и таблица лидеров. Включает веб-приложение (Telegram WebApp) для просмотра результатов.
 
 ## Возможности
 
 ### Для участников (в группе)
-- 🎥 Предложение фильмов через reply на закрепленное сообщение
-- 🗳️ Голосование за фильмы с помощью Telegram Poll
-- ⭐ Выставление рейтингов после просмотра (1-10)
-- 🏆 Просмотр таблицы лидеров с пагинацией
-- 🔍 Поиск фильмов по названию
+- Предложение фильмов через reply на закрепленное сообщение
+- Голосование за фильмы с помощью Telegram Poll
+- Выставление рейтингов после просмотра (1-10)
+- Просмотр таблицы лидеров с пагинацией
+- Поиск фильмов по названию
+- Веб-приложение внутри Telegram (WebApp)
 
 ### Для администраторов (в личных сообщениях)
-- ➕ Добавление фильмов-победителей вручную (для истории)
-- 📊 Добавление рейтингов для исторических фильмов
-- ✏️ Редактирование и удаление фильмов
-- 📈 Экспорт таблицы лидеров
-- 🔧 Управление сессиями
+- Добавление фильмов-победителей вручную (для истории)
+- Добавление рейтингов для исторических фильмов
+- Редактирование и удаление фильмов
+- Экспорт таблицы лидеров
+- Управление сессиями
 
 ## Технологии
 
-- **Python 3.12**
-- **aiogram 3.x** - асинхронная библиотека для Telegram Bot API
-- **PostgreSQL 16** - база данных
-- **SQLAlchemy 2.0** - ORM (асинхронный режим)
-- **Alembic** - миграции базы данных
-- **Docker Compose** - контейнеризация
+- **Python 3.12** + **aiogram 3.x** — Telegram Bot
+- **FastAPI** + **uvicorn** — REST API для WebApp
+- **React 18** + **TypeScript** + **Vite** — фронтенд (Telegram WebApp)
+- **PostgreSQL 16** + **SQLAlchemy 2.0** (async) + **Alembic** — база данных
+- **Docker Compose** — контейнеризация (бот, API, БД, nginx)
+- **nginx** + **Let's Encrypt** — reverse proxy, SSL/TLS, раздача SPA
+
+---
 
 ## Деплой на VPS
 
 ### Требования
 
-- VPS с Ubuntu 22.04+ (или другой Linux-дистрибутив)
-- Минимум 1 ГБ RAM, 10 ГБ диска
-- Доступ по SSH с правами root (для первоначальной настройки)
+- VPS с Ubuntu 22.04+ (или другой Linux), минимум 1 ГБ RAM, 10 ГБ диска
+- Домен, DNS A-запись которого указывает на IP сервера
+- SSH-доступ с правами root
 
-### 1. Подготовка сервера (от root, один раз)
+### 1. Подготовка сервера (один раз, от root)
 
-Подключитесь к серверу по SSH от root и выполните следующие шаги.
+#### Установка git
+
+```bash
+apt update && apt install -y git
+```
 
 #### Установка Docker
 
 ```bash
-# Add Docker's official GPG key:
-sudo apt update
-sudo apt install ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-# Add the repository to Apt sources:
-sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+apt update && apt install -y ca-certificates curl
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+tee /etc/apt/sources.list.d/docker.sources <<EOF
 Types: deb
 URIs: https://download.docker.com/linux/ubuntu
 Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
 Components: stable
 Signed-By: /etc/apt/keyrings/docker.asc
 EOF
-
-sudo apt update
-sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+apt update
+apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
-#### Создание пользователя bot
-
-Создаём системного пользователя с домашней директорией, без интерактивного шелла, и с доступом к Docker:
+#### Создание пользователя bot (опционально, рекомендуется)
 
 ```bash
 adduser --disabled-password --gecos "" --shell /usr/sbin/nologin bot
 usermod -aG docker bot
 ```
 
-> Пользователь `bot` не имеет пароля и не может войти в интерактивный шелл.
-> Все команды выполняются от root через `su -s /bin/bash bot`.
-
-### 2. Клонирование и настройка проекта
-
-Все последующие команды выполняются от root через `su`:
+### 2. Клонирование и настройка
 
 ```bash
-su -s /bin/bash - bot
-```
-
-Клонируйте репозиторий в домашнюю директорию:
-
-```bash
-cd ~
-git clone <repository-url> film_bot
-cd film_bot
-```
-
-Создайте и заполните файл `.env`:
-
-```bash
+git clone <repository-url> ~/film_bot
+cd ~/film_bot
 cp .env.example .env
 nano .env
 ```
 
-Заполните значения:
+Заполните `.env`:
 
-```env
+```dotenv
+# Telegram
 TELEGRAM_BOT_TOKEN=токен_от_BotFather
-TELEGRAM_GROUP_ID=-1001234567890
-TELEGRAM_ADMIN_IDS=123456789,987654321
-DB_PASSWORD=надёжный_пароль_для_БД
+TELEGRAM_GROUP_IDS=-1001234567890
+TELEGRAM_ADMIN_IDS=123456789
+
+# База данных
+DB_PASSWORD=надёжный_пароль
+
+# Домен и SSL
+DOMAIN=yourdomain.com
+WEBAPP_URL=https://yourdomain.com
+CERTBOT_EMAIL=admin@yourdomain.com
 ```
 
-#### Как получить Group ID:
-1. Добавьте бота [@userinfobot](https://t.me/userinfobot) в вашу группу
-2. Он отправит ID группы (например: `-1001234567890`)
-3. Удалите бота из группы
+> **Как получить Group ID:** добавьте [@userinfobot](https://t.me/userinfobot) в группу — он пришлёт ID.
+> **Как получить свой ID:** напишите [@userinfobot](https://t.me/userinfobot) в личку.
 
-#### Как получить Admin ID:
-1. Напишите боту [@userinfobot](https://t.me/userinfobot) в личку
-2. Он отправит ваш Telegram ID
-
-### 3. Запуск
+### 3. Первый деплой
 
 ```bash
-make up
+make setup
 ```
 
-Бот автоматически:
-- Запустит PostgreSQL
-- Применит миграции базы данных
-- Запустит бота
+Команда выполнит всё автоматически:
+1. Проверит `.env` и наличие всех необходимых переменных
+2. Проверит prerequisites (Docker)
+3. Получит SSL-сертификат от Let's Encrypt
+4. Соберёт Docker-образы (включая React SPA внутри образа nginx) и запустит сервисы
+5. Настроит cron для авторенивала сертификата (ежедневно в 03:00)
 
-Проверить статус:
+После завершения WebApp доступен по адресу `https://yourdomain.com`.
+
+---
+
+## Обновление
+
+При появлении новой версии в репозитории:
 
 ```bash
-make status
-make logs
-```
-
-### 4. Обновление
-
-При появлении обновлений в репозитории:
-
-```bash
-cd ~/film_bot
 make update
 ```
 
-Эта команда выполнит `git pull` и пересоберёт контейнеры.
+Команда выполнит:
+- `git pull`
+- `docker compose up -d --build` для пересборки образов (React SPA пересобирается внутри образа nginx) и перезапуска контейнеров
+- Перезагрузку nginx, если изменился шаблон конфигурации
 
-### 5. Управление (справочник команд)
+---
 
-| Команда          | Описание                                      |
-|------------------|-----------------------------------------------|
-| `make up`        | Запуск всех сервисов                          |
-| `make down`      | Остановка всех сервисов                       |
-| `make restart`   | Перезапуск контейнера бота                    |
-| `make update`    | Обновление: git pull + пересборка + перезапуск|
-| `make logs`      | Просмотр логов всех сервисов                  |
-| `make logs-bot`  | Логи только бота                              |
-| `make status`    | Статус контейнеров                            |
-| `make clean`     | Удаление контейнеров и образов (БД сохраняется)|
-| `make clean-all` | Полная очистка включая данные БД              |
+## Смена домена
+
+```bash
+# 1. Обновите DOMAIN, WEBAPP_URL и CERTBOT_EMAIL в .env
+
+# 2. Получите сертификат для нового домена
+docker compose stop nginx
+certbot certonly --standalone --non-interactive --agree-tos \
+    --email admin@newdomain.com --domain newdomain.com
+
+# 3. Перезапустите — nginx подхватит новый DOMAIN из .env
+docker compose up -d
+```
+
+---
+
+## Справочник команд
+
+| Команда | Описание |
+|---------|----------|
+| `make setup` | Первый деплой: SSL + сборка web + запуск |
+| `make update` | Обновление: pull + rebuild + restart |
+| `make up` | Запуск всех сервисов |
+| `make down` | Остановка всех сервисов |
+| `make restart` | Перезапуск контейнера бота |
+| `make build-web` | Пересборка nginx-образа (включает React SPA) |
+| `make reload-nginx` | Перезагрузить конфиг nginx без рестарта |
+| `make logs` | Логи всех сервисов |
+| `make logs-bot` | Логи бота |
+| `make logs-api` | Логи API |
+| `make logs-nginx` | Логи nginx |
+| `make status` | Статус контейнеров |
+| `make build` | Пересборка docker-образов |
+| `make clean` | Удалить контейнеры и образы (БД сохраняется) |
+| `make clean-all` | Полная очистка включая данные БД (ОСТОРОЖНО!) |
 
 ---
 
@@ -165,179 +175,109 @@ make update
 ### Запуск через Docker Compose
 
 ```bash
-git clone <repository-url>
-cd film_bot
-cp .env.example .env
-# Отредактируйте .env
-make up
+cp .env.example .env  # заполните токены, домен можно оставить localhost
+make up               # соберёт образы (включая React SPA) и запустит сервисы
 ```
 
 ### Запуск без Docker
 
-1. Установите PostgreSQL 16
-2. Создайте виртуальное окружение:
+1. Установите PostgreSQL 16 и создайте БД
+2. Установите зависимости:
 
 ```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# или
-venv\Scripts\activate  # Windows
-```
-
-3. Установите зависимости:
-
-```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-4. Примените миграции:
+3. Примените миграции:
 
 ```bash
 alembic upgrade head
 ```
 
-5. Запустите бота:
+4. Запустите бота:
 
 ```bash
-python -m bot.main
+PYTHONPATH=src python -m bot.main
 ```
 
 ### Создание миграций
 
-После изменения моделей в `bot/database/models.py`:
-
 ```bash
-alembic revision --autogenerate -m "Description of changes"
+alembic revision --autogenerate -m "Description"
 alembic upgrade head
 ```
+
+---
 
 ## Workflow использования
 
 ### 1. Создание сессии киноклуба
 
-В группе любой участник отправляет:
-
-```
-/new_session
-```
-
-Бот закрепит сообщение для сбора предложений.
+В группе любой участник отправляет `/new_session`. Бот закрепит сообщение для сбора предложений.
 
 ### 2. Предложение фильмов
 
-Ответьте (reply) на закрепленное сообщение со ссылками на Кинопоиск:
+Ответьте (reply) на закреп со ссылкой на Кинопоиск:
 
-**Два фильма сразу:**
 ```
 https://www.kinopoisk.ru/film/301/
 https://www.kinopoisk.ru/film/326/
 ```
 
-**Один фильм:**
-```
-https://www.kinopoisk.ru/film/301/
-```
-Затем выберите слот (1 или 2) через inline кнопки.
+Затем выберите слот через inline-кнопки.
 
-### 3. Запуск голосования
-
-Когда все предложения собраны:
+### 3. Голосование
 
 ```
-/start_voting
+/start_voting   — создать Telegram Poll
+/finish_voting  — подвести итоги
 ```
 
-Бот создаст два опроса (для слота 1 и слота 2).
+### 4. Рейтинги
 
-### 4. Завершение голосования
-
-После голосования:
-
-```
-/finish_voting
-```
-
-Бот определит победителей или предложит повторное голосование при ничьей.
-
-### 5. Выставление рейтингов
-
-После просмотра фильмов:
+После просмотра:
 
 ```
 /rate
 ```
 
-Выберите оценку от 1 до 10 для каждого фильма.
-
-### 6. Таблица лидеров
-
-Просмотр рейтинга:
+### 5. Таблица лидеров
 
 ```
 /leaderboard
-```
-
-Поиск фильма:
-
-```
 /search Матрица
 ```
 
-## Админские команды
+---
 
-Доступны только в личных сообщениях с ботом:
-
-- `/add_movie` - добавить фильм вручную
-- `/add_ratings <movie_id>` - добавить рейтинги
-- `/edit_movie <movie_id>` - редактировать фильм
-- `/delete_movie <movie_id>` - удалить фильм
-- `/cancel_session` - отменить текущую сессию
-- `/export_leaderboard` - экспорт данных
-- `/admin_help` - справка по админским командам
-
-## Структура проекта
+## Архитектура
 
 ```
 film_bot/
-├── bot/
-│   ├── __init__.py
-│   ├── main.py              # Точка входа
-│   ├── config.py            # Конфигурация
-│   ├── middlewares.py       # Middleware
-│   ├── keyboards.py         # Inline клавиатуры
-│   ├── handlers/            # Обработчики команд
-│   │   ├── session.py
-│   │   ├── proposals.py
-│   │   ├── voting.py
-│   │   ├── rating.py
-│   │   ├── leaderboard.py
-│   │   └── admin.py
-│   ├── services/            # Бизнес-логика
-│   │   ├── kinopoisk.py
-│   │   └── voting_logic.py
-│   └── database/            # База данных
-│       ├── models.py
-│       └── session.py
-├── alembic/                 # Миграции
+├── src/
+│   ├── bot/             # Telegram-бот (aiogram)
+│   │   ├── handlers/    # Обработчики команд
+│   │   ├── services/    # Кинопоиск API, логика голосований
+│   │   ├── database/    # ORM-модели, репозитории, миграции
+│   │   └── main.py
+│   ├── api/             # FastAPI (для WebApp)
+│   └── alembic/         # Миграции БД
+├── web/                 # React SPA (Telegram WebApp); собирается внутри Docker
+├── nginx/
+│   └── templates/
+│       └── filmbot.conf.template  # Шаблон конфига (DOMAIN из .env)
+├── scripts/
+│   ├── setup.sh         # Первый деплой
+│   └── update.sh        # Обновление
 ├── docker-compose.yml
-├── Dockerfile
-├── requirements.txt
-└── README.md
+├── Dockerfile           # Bot
+├── Dockerfile.api       # API
+├── Dockerfile.nginx     # nginx + multi-stage сборка React SPA
+└── Makefile
 ```
-
-## База данных
-
-### Схема
-
-- **users** - участники киноклуба
-- **groups** - авторизованные группы
-- **admins** - администраторы
-- **sessions** - сессии киноклуба
-- **movies** - предложенные фильмы
-- **votes** - голоса
-- **ratings** - рейтинги (целочисленные 1-10)
 
 ## Лицензия
 
 MIT
-

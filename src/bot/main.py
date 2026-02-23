@@ -9,16 +9,12 @@ from aiogram.enums import ParseMode
 from aiogram.types import BotCommand, BotCommandScopeAllGroupChats, BotCommandScopeAllPrivateChats, BotCommandScopeDefault
 
 from bot.config import config
-from bot.middlewares import (
-    AccessCheckMiddleware,
-    PollAnswerLoggingMiddleware,
-    ErrorLoggingMiddleware,
-)
+from bot.middlewares import AccessCheckMiddleware, ErrorLoggingMiddleware
 from bot.database import init_db
 from bot.log_handler import InMemoryLogHandler
 
 # Import handlers
-from bot.handlers import session, proposals, voting, rating, leaderboard, admin
+from bot.handlers import session, admin
 
 # Configure logging
 logging.basicConfig(
@@ -39,21 +35,18 @@ logger = logging.getLogger(__name__)
 
 
 async def setup_bot_commands(bot: Bot) -> None:
-    """Register bot commands for the Telegram menu button.
-    
-    Sets different command lists for group chats and private (admin) chats.
-    """
-    # Minimal slash commands — everything else is in the reply keyboard
+    """Register bot commands for the Telegram menu button."""
     common_commands = [
-        BotCommand(command="start", description="Показать клавиатуру"),
+        BotCommand(command="start", description="Открыть приложение киноклуба"),
         BotCommand(command="help", description="Помощь"),
     ]
     await bot.set_my_commands(common_commands, scope=BotCommandScopeAllGroupChats())
     await bot.set_my_commands(common_commands, scope=BotCommandScopeDefault())
 
-    # Commands for private chats (admin only)
     private_commands = [
-        BotCommand(command="admin", description="Админ-панель"),
+        BotCommand(command="start", description="Открыть приложение"),
+        BotCommand(command="help", description="Помощь"),
+        BotCommand(command="admin", description="Панель управления"),
     ]
     await bot.set_my_commands(private_commands, scope=BotCommandScopeAllPrivateChats())
 
@@ -62,7 +55,6 @@ async def setup_bot_commands(bot: Bot) -> None:
 
 async def main() -> None:
     """Main function to start the bot."""
-    # Validate configuration
     try:
         config.validate()
         logger.info("Configuration validated successfully")
@@ -70,7 +62,6 @@ async def main() -> None:
         logger.error("Configuration error: %s", e)
         sys.exit(1)
 
-    # Initialize database
     try:
         await init_db()
         logger.info("Database initialized successfully")
@@ -78,44 +69,29 @@ async def main() -> None:
         logger.error("Database initialization error: %s", e)
         sys.exit(1)
 
-    # Create bot instance
     bot = Bot(
         token=config.BOT_TOKEN,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
     )
 
-    # Register bot commands for menu button
     try:
         await setup_bot_commands(bot)
     except Exception as e:
         logger.warning("Failed to set bot commands: %s", e)
 
-    # Create dispatcher
     dp = Dispatcher()
 
-    # Register middleware
-    # Error logging middleware (outermost — catches all unhandled exceptions)
+    # Middleware
     dp.message.outer_middleware(ErrorLoggingMiddleware())
     dp.callback_query.outer_middleware(ErrorLoggingMiddleware())
-
-    # Access check middleware
     dp.message.middleware(AccessCheckMiddleware())
     dp.callback_query.middleware(AccessCheckMiddleware())
 
-    # PollAnswer logging (no access check — poll answers have no chat context)
-    dp.poll_answer.middleware(PollAnswerLoggingMiddleware())
-
-    # Register routers (handlers)
+    # Routers
     dp.include_router(session.router)
-    dp.include_router(proposals.router)
-    dp.include_router(voting.router)
-    dp.include_router(rating.router)
-    dp.include_router(leaderboard.router)
     dp.include_router(admin.router)
 
     logger.info("Starting bot...")
-    
-    # Start polling
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:

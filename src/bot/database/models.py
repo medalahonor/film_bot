@@ -3,10 +3,11 @@ from datetime import datetime
 from typing import List, Optional
 
 from sqlalchemy import (
-    BigInteger, String, Integer, Text, DateTime, ForeignKey,
+    BigInteger, Boolean, String, Integer, Text, DateTime, ForeignKey,
     UniqueConstraint, DECIMAL
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import text
 
 
 class Base(DeclarativeBase):
@@ -39,6 +40,7 @@ class User(Base):
     username: Mapped[Optional[str]] = mapped_column(String(255))
     first_name: Mapped[Optional[str]] = mapped_column(String(255))
     last_name: Mapped[Optional[str]] = mapped_column(String(255))
+    is_allowed: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text('true'))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships
@@ -100,6 +102,8 @@ class Session(Base):
     poll_slot2_movie_ids: Mapped[Optional[str]] = mapped_column(Text)
     winner_slot1_id: Mapped[Optional[int]] = mapped_column(ForeignKey("movies.id"))
     winner_slot2_id: Mapped[Optional[int]] = mapped_column(ForeignKey("movies.id"))
+    runoff_slot1_ids: Mapped[Optional[str]] = mapped_column(Text)
+    runoff_slot2_ids: Mapped[Optional[str]] = mapped_column(Text)
     rating_msg_slot1_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     rating_msg_slot2_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     rating_scoreboard_msg_id: Mapped[Optional[int]] = mapped_column(BigInteger)
@@ -158,6 +162,9 @@ class Movie(Base):
     poster_url: Mapped[Optional[str]] = mapped_column(String(1000))
     kinopoisk_rating: Mapped[Optional[float]] = mapped_column(DECIMAL(3, 1))
     club_rating: Mapped[Optional[float]] = mapped_column(DECIMAL(4, 2))
+    trailer_url: Mapped[Optional[str]] = mapped_column(String(1000))
+    type: Mapped[str] = mapped_column(String(20))  # 'film' or 'serial'
+    year_end: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships

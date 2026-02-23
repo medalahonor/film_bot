@@ -28,6 +28,9 @@ class Config:
         "postgresql+asyncpg://filmbot:password@localhost:5432/filmbot"
     )
 
+    # WebApp URL (used for the inline WebApp button in /start)
+    WEBAPP_URL: str = os.getenv("WEBAPP_URL", "")
+
     @classmethod
     def _parse_groups(cls) -> None:
         """Parse TELEGRAM_GROUP_IDS into GROUP_IDS and GROUP_TOPIC_MAP."""

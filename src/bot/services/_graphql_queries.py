@@ -231,6 +231,31 @@ FILM_BASE_INFO_QUERY = (
 )
 # fmt: on
 
+# ── SuggestSearch ────────────────────────────────────────────────────────
+# NOTE: Kinopoisk uses query allowlisting. If this query is rejected (HTTP 400
+# or an "errors" response), extract the exact SuggestSearch query from the
+# Kinopoisk frontend (browser DevTools → Network → graphql?operationName=SuggestSearch)
+# and replace the string below verbatim.
+
+SUGGEST_SEARCH_URL = "https://graphql.kinopoisk.ru/graphql/?operationName=SuggestSearch"
+
+# fmt: off
+SUGGEST_SEARCH_QUERY = (
+    'query SuggestSearch($queryText: String!, $isAuthorized: Boolean!, $limit: Int)'
+    ' { suggest(query: $queryText) { top { movies(limit: $limit) { movie { id __typename'
+    ' title { russian original __typename }'
+    ' ... on Film { productionYear rating { kinopoisk { value __typename } __typename }'
+    ' gallery { posters { vertical { avatarsUrl fallbackUrl __typename } __typename } __typename } __typename }'
+    ' ... on TvSeries { releaseYears { start end __typename } rating { kinopoisk { value __typename } __typename }'
+    ' gallery { posters { vertical { avatarsUrl fallbackUrl __typename } __typename } __typename } __typename }'
+    ' ... on TvShow { releaseYears { start end __typename } rating { kinopoisk { value __typename } __typename }'
+    ' gallery { posters { vertical { avatarsUrl fallbackUrl __typename } __typename } __typename } __typename }'
+    ' ... on MiniSeries { releaseYears { start end __typename } rating { kinopoisk { value __typename } __typename }'
+    ' gallery { posters { vertical { avatarsUrl fallbackUrl __typename } __typename } __typename } __typename }'
+    ' } } } } }'
+)
+# fmt: on
+
 FILM_BASE_INFO_VARIABLES_TEMPLATE = {
     "isAuthorized": False,
     "actorsLimit": 10,
