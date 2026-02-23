@@ -7,7 +7,7 @@ server {
     }
 
     location / {
-        return 301 https://$$host$$request_uri;
+        return 301 https://$host$request_uri;
     }
 }
 
@@ -23,7 +23,7 @@ server {
     # React SPA
     location / {
         root /var/www/webapp;
-        try_files $$uri /index.html;
+        try_files $uri /index.html;
 
         location ~* \.(js|css|png|jpg|ico|svg|woff2?)$ {
             expires 1y;
@@ -34,9 +34,9 @@ server {
     # API proxy
     location /api/ {
         proxy_pass http://api:8000;
-        proxy_set_header Host $$host;
-        proxy_set_header X-Real-IP $$remote_addr;
-        proxy_set_header X-Forwarded-Proto $$scheme;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     location /health {
