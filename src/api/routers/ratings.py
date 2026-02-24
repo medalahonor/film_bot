@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import get_db, get_current_user
 from api.schemas.rating import RatingRequest, RatingResponse
-from bot.database.models import Movie, Rating, Session, SessionStatus, User
-from bot.database.status_manager import STATUS_RATING
+from api.database.models import Movie, Rating, Session, SessionStatus, User
+from api.database.status_manager import STATUS_RATING
 
 router = APIRouter(prefix="/api/ratings", tags=["ratings"])
 

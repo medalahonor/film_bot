@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.config import config
 from api.routers import admin, kinopoisk, leaderboard, movies, ratings, sessions, users, votes
-from bot.log_handler import InMemoryLogHandler
+from api.log_handler import InMemoryLogHandler
 
 # Configure logging with in-memory handler for /api/admin/logs
 logging.basicConfig(

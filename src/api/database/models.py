@@ -73,7 +73,7 @@ class Session(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     status_id: Mapped[int] = mapped_column(
-        ForeignKey("session_statuses.id"), 
+        ForeignKey("session_statuses.id"),
         nullable=False
     )
     pinned_message_id: Mapped[Optional[int]] = mapped_column(BigInteger)

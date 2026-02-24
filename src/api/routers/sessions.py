@@ -11,8 +11,8 @@ from api.dependencies import get_db, get_current_user
 from api.schemas.movie import MovieResponse
 from api.schemas.session import SessionResponse
 from api.telegram_notify import notify_session_status_changed
-from bot.database.models import Movie, Session, SessionStatus, User
-from bot.database.status_manager import STATUS_COLLECTING, STATUS_COMPLETED
+from api.database.models import Movie, Session, SessionStatus, User
+from api.database.status_manager import STATUS_COLLECTING, STATUS_COMPLETED
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 

@@ -33,7 +33,7 @@ alembic revision --autogenerate -m "Description"
 alembic upgrade head
 ```
 
-Alembic настроен на `src/alembic/`, `prepend_sys_path = src`. URL базы берётся из `bot.config` (env var `DATABASE_URL`), а не из alembic.ini.
+Alembic настроен на `src/alembic/`, `prepend_sys_path = src`. URL базы берётся из переменной окружения `DATABASE_URL` напрямую (через `os.environ`), а не из alembic.ini.
 
 ## Architecture
 
@@ -55,25 +55,13 @@ Telegram user
 
 ### src/bot/ — Telegram-бот (aiogram)
 
-Бот минималистичен: только регистрация команд и открытие WebApp.
-
-```
-handlers/  → keyboards + middlewares
-                 ↓
-           database/models.py (shared с API)
-```
+Бот минималистичен: только регистрация команд и открытие WebApp. Не работает с БД напрямую — вся бизнес-логика в API.
 
 - **handlers/session.py** — `/start` (отправляет inline-кнопку WebApp), `/help`.
 - **handlers/admin.py** — `/admin` (отправляет ссылку на WebApp-панель, только для ADMIN_IDS).
-- **database/models.py** — SQLAlchemy ORM-модели: `User`, `Group`, `Admin`, `Session`, `SessionStatus`, `Movie`, `Vote`, `Rating`. Все relationship используют `lazy="selectin"`.
-- **database/repositories.py** — DB-запросы (get/create group, user, session, movie CRUD, пагинация). Принимают `db: AsyncSession` первым аргументом.
-- **database/status_manager.py** — константы статусов (`collecting` → `voting` → `rating` → `completed`) и seed-инициализация.
-- **database/session.py** — async engine, sessionmaker (`AsyncSessionLocal`), `init_db()`.
-- **services/kinopoisk.py** — парсинг фильма через GraphQL API Кинопоиска (`graphql.kinopoisk.ru`): `parse_movie_data(url)`, `get_movie_by_id(id)`, `suggest_search(query)`.
-- **services/voting_logic.py** — `determine_winner(vote_counts)` → `(winner_ids, is_tie)`, `format_vote_results(...)`.
 - **keyboards.py** — `get_webapp_keyboard(url)` → InlineKeyboardMarkup с кнопкой «Открыть киноклуб» (WebAppInfo).
 - **middlewares.py** — `AccessCheckMiddleware` (фильтр по GROUP_IDS, topic_id, приват только для ADMIN_IDS), `ErrorLoggingMiddleware`.
-- **log_handler.py** — `InMemoryLogHandler` (deque на 200 записей), `get_recent_logs(n)`.
+- **log_handler.py** — `InMemoryLogHandler` (deque на 200 записей), `get_recent_logs(n)` — только для логов бот-процесса.
 - **formatters.py** — `format_movie_title`, `format_user_display_name`, `format_year_suffix`.
 - **utils.py** — FSM-утилиты: `try_delete_message`, `replace_bot_message`, `abort_flow`, `finish_flow`.
 
@@ -91,6 +79,16 @@ handlers/  → keyboards + middlewares
 ### src/api/ — FastAPI (вся бизнес-логика)
 
 Аутентификация: `X-Telegram-InitData` header → HMAC-SHA256 валидация → резолв в `User`.
+
+**Модели и сервисы** (`src/api/`):
+
+- **database/models.py** — SQLAlchemy ORM-модели: `User`, `Admin`, `Session`, `SessionStatus`, `Movie`, `Vote`, `Rating`. Все relationship используют `lazy="selectin"`.
+- **database/repositories.py** — DB-запросы (get/create user, session, movie CRUD, пагинация). Принимают `db: AsyncSession` первым аргументом.
+- **database/status_manager.py** — константы статусов (`collecting` → `voting` → `rating` → `completed`) и seed-инициализация.
+- **database/session.py** — async engine, sessionmaker (`AsyncSessionLocal`), `init_db()`. Читает `DATABASE_URL` из `api.config`.
+- **services/kinopoisk.py** — парсинг фильма через GraphQL API Кинопоиска (`graphql.kinopoisk.ru`): `parse_movie_data(url)`, `get_movie_by_id(id)`, `get_series_by_id(id)`, `suggest_search(query)`.
+- **services/_graphql_queries.py** — GraphQL-запросы для Кинопоиска (query allowlisting).
+- **log_handler.py** — `InMemoryLogHandler` (deque на 200 записей), `get_recent_logs(n)` — для логов API-процесса, читается через `/api/admin/logs`.
 
 **Роутеры** (`/api/*`):
 
@@ -112,7 +110,7 @@ handlers/  → keyboards + middlewares
 
 **Уведомления** (`telegram_notify.py`) — best-effort отправка в Telegram-группу из API (aiohttp, raw Bot API). Учитывает `topic_id` из конфига.
 
-**DB access pattern в API**: `async with AsyncSessionLocal() as db:` или через `Depends(get_db)`. Бизнес-логика в роутерах, query-утилиты в `bot.database.repositories`.
+**DB access pattern в API**: через `Depends(get_db)` (из `api.dependencies`). Бизнес-логика в роутерах, query-утилиты в `api.database.repositories`.
 
 ### src/api/schemas/ — Pydantic-схемы
 
@@ -147,16 +145,18 @@ web/src/
 
 ### DB access pattern
 
-И бот, и API используют `async with AsyncSessionLocal() as db:` напрямую. Все query-функции в `bot.database.repositories` принимают `db: AsyncSession` первым аргументом.
+API использует `Depends(get_db)` из `api.dependencies`. Все query-функции в `api.database.repositories` принимают `db: AsyncSession` первым аргументом. Бот к БД не обращается.
 
 ## Conventions
 
-- **Запрет перекрёстных импортов хэндлеров.** Общий код — в `repositories.py`, `formatters.py`, `utils.py`.
+- **Запрет перекрёстных импортов.** `bot/` не импортирует из `api/`. Общий DB-код — в `api/database/`, сервисы — в `api/services/`.
 - **Максимум 30-40 строк на функцию.** Длинные — разбивать на `_helper`-функции.
 - **snake_case** для функций/переменных, **PascalCase** для классов, **SCREAMING_SNAKE_CASE** для констант, **_prefix** для приватных хелперов.
 - Все клавиатуры бота — в `keyboards.py`.
 - API-роутеры: внутренние хелперы именовать с `_` (например `_session_to_response`, `_resolve_group`).
 - Новые API-эндпоинты добавляются в соответствующий роутер в `src/api/routers/`, схемы — в `src/api/schemas/`.
+- Новые сервисы (внешние API, бизнес-логика) — в `src/api/services/`.
+- ORM-модели и query-функции — в `src/api/database/`.
 
 ## Development Workflow
 
@@ -236,7 +236,7 @@ web/src/
 
 #### Стратегия тестирования
 
-- **Unit-тесты** покрывают чистые функции: бизнес-логику (`voting_logic.py`, `formatters.py`), парсинг данных, трансформации.
+- **Unit-тесты** покрывают чистые функции: бизнес-логику (`api/services/kinopoisk.py`, `bot/formatters.py`), парсинг данных, трансформации.
 - **Интеграционные тесты** покрывают слой репозиториев с тестовой БД (SQLite in-memory или PostgreSQL в Docker).
 - **Тесты хэндлеров** — через `aiogram` test utilities, проверяют сценарии FSM-потоков.
 

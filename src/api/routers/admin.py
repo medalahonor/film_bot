@@ -11,8 +11,8 @@ from api.dependencies import get_db, get_admin
 from api.schemas.movie import MovieResponse
 from api.schemas.session import SessionResponse
 from api.schemas.user import UserResponse
-from bot.database.models import Movie, Session, User
-from bot.log_handler import get_recent_logs
+from api.database.models import Movie, Session, User
+from api.log_handler import get_recent_logs
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -154,7 +154,7 @@ async def db_stats(
     _admin: User = Depends(get_admin),
 ) -> dict:
     from sqlalchemy import func
-    from bot.database.models import Rating, Vote
+    from api.database.models import Rating, Vote
     total_sessions = (await db.execute(select(func.count(Session.id)))).scalar() or 0
     total_movies = (await db.execute(select(func.count(Movie.id)))).scalar() or 0
     total_users = (await db.execute(select(func.count(User.id)))).scalar() or 0
@@ -220,7 +220,7 @@ async def batch_import(
     Body: {session_id: int, slot: int, urls: list[str]}
     Returns: {imported: [...MovieResponse], errors: [{url, reason}]}
     """
-    from bot.services.kinopoisk import parse_movie_data
+    from api.services.kinopoisk import parse_movie_data
 
     session_id: int = int(body.get("session_id", 0))
     slot: int = int(body.get("slot", 1))

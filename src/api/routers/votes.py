@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.dependencies import get_db, get_current_user
 from api.schemas.vote import MovieVoteResult, VoteRequest, VoteResponse, VoteResultsResponse
 from api.telegram_notify import notify_voting_finalized
-from bot.database.models import Movie, Session, SessionStatus, User, Vote
-from bot.database.status_manager import STATUS_RATING, STATUS_VOTING
+from api.database.models import Movie, Session, SessionStatus, User, Vote
+from api.database.status_manager import STATUS_RATING, STATUS_VOTING
 
 router = APIRouter(prefix="/api/votes", tags=["votes"])
 

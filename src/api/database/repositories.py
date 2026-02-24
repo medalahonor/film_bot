@@ -11,8 +11,8 @@ from typing import Optional, List, Tuple
 from sqlalchemy import select, func, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.database.models import User, Session, Movie, Rating, Vote
-from bot.database.status_manager import get_status_by_code, STATUS_COMPLETED
+from api.database.models import User, Session, Movie, Rating, Vote
+from api.database.status_manager import get_status_by_code, STATUS_COMPLETED
 
 logger = logging.getLogger(__name__)
 

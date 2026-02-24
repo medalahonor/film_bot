@@ -45,6 +45,7 @@ export const ProposePage: React.FC = () => {
     loading: detailLoading,
     error: detailError,
     fetchById,
+    fetchSeriesById,
     fetchByUrl,
     reset: resetDetail,
   } = useMovieDetail();
@@ -80,7 +81,11 @@ export const ProposePage: React.FC = () => {
     setSelectedSuggest(item);
     clearSuggest();
     setSearchQuery(item.title);
-    await fetchById(item.kinopoisk_id);
+    if (item.type === 'serial') {
+      await fetchSeriesById(item.kinopoisk_id);
+    } else {
+      await fetchById(item.kinopoisk_id);
+    }
   };
 
   const handleUrlParse = async () => {

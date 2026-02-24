@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 
 from api.auth import get_init_data_user
 from api.config import config
-from bot.database.models import User
+from api.database.models import User
 
 _engine = create_async_engine(config.database_url, pool_pre_ping=True)
 _session_factory = async_sessionmaker(_engine, expire_on_commit=False)

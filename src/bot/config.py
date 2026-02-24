@@ -22,12 +22,6 @@ class Config:
     GROUP_IDS: List[int] = []
     GROUP_TOPIC_MAP: Dict[int, Optional[int]] = {}
 
-    # Database settings
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL",
-        "postgresql+asyncpg://filmbot:password@localhost:5432/filmbot"
-    )
-
     # WebApp URL (used for the inline WebApp button in /start)
     WEBAPP_URL: str = os.getenv("WEBAPP_URL", "")
 
@@ -57,8 +51,6 @@ class Config:
             raise ValueError("TELEGRAM_BOT_TOKEN is not set")
         if not cls.ADMIN_IDS:
             raise ValueError("TELEGRAM_ADMIN_IDS is not set")
-        if not cls.DATABASE_URL:
-            raise ValueError("DATABASE_URL is not set")
 
 
 Config._parse_groups()

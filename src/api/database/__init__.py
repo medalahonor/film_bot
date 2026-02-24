@@ -1,9 +1,9 @@
 """Database package."""
-from bot.database.session import get_session, init_db
-from bot.database.models import (
+from api.database.session import get_session, init_db
+from api.database.models import (
     Base, User, Admin, Session, SessionStatus, Movie, Vote, Rating
 )
-from bot.database.status_manager import (
+from api.database.status_manager import (
     get_status_by_code,
     init_statuses,
     STATUS_COLLECTING,
@@ -11,7 +11,7 @@ from bot.database.status_manager import (
     STATUS_RATING,
     STATUS_COMPLETED,
 )
-from bot.database.repositories import (
+from api.database.repositories import (
     get_or_create_user,
     get_user_by_username,
     get_active_session,

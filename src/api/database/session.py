@@ -7,12 +7,12 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker
 )
 
-from bot.config import config
-from bot.database.models import Base
+from api.config import config
+from api.database.models import Base
 
 # Create async engine
 engine = create_async_engine(
-    config.DATABASE_URL,
+    config.database_url,
     echo=False,  # Set to True for SQL query logging
     pool_pre_ping=True,
     pool_size=10,
@@ -31,23 +31,23 @@ AsyncSessionLocal = async_sessionmaker(
 
 async def init_db() -> None:
     """Initialize database (create all tables).
-    
+
     Note: Use Alembic migrations for schema changes.
     This function is kept for backward compatibility and testing.
     """
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
+
     # Initialize default statuses if they don't exist
     # (for testing or when running without migrations)
-    from bot.database.status_manager import init_statuses
+    from api.database.status_manager import init_statuses
     async with AsyncSessionLocal() as session:
         await init_statuses(session)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """Get database session.
-    
+
     Usage:
         async with get_session() as session:
             # use session

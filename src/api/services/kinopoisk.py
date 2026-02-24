@@ -34,11 +34,14 @@ GRAPHQL_HEADERS = {
     'X-Preferred-Language': 'ru',
 }
 
-from bot.services._graphql_queries import (
+from api.services._graphql_queries import (
     FILM_BASE_INFO_QUERY,
     FILM_BASE_INFO_VARIABLES_TEMPLATE,
     SUGGEST_SEARCH_QUERY,
     SUGGEST_SEARCH_URL,
+    TV_SERIES_BASE_INFO_QUERY,
+    TV_SERIES_BASE_INFO_URL,
+    TV_SERIES_BASE_INFO_VARIABLES_TEMPLATE,
 )
 
 # Poster size suffix for avatarsUrl
@@ -187,10 +190,14 @@ def _parse_graphql_response(data: Dict[str, Any], kinopoisk_id: str) -> Dict[str
     trailer_url = None
     main_trailer = film.get("mainTrailer") or {}
     trailer_id = main_trailer.get("id")
-    if trailer_id:
-        trailer_url = f"https://www.kinopoisk.ru/film/{kinopoisk_id}/video/{trailer_id}/"
-
-    normalized_url = f"https://www.kinopoisk.ru/film/{kinopoisk_id}/"
+    if content_type == 'serial':
+        normalized_url = f"https://www.kinopoisk.ru/series/{kinopoisk_id}/"
+        if trailer_id:
+            trailer_url = f"https://www.kinopoisk.ru/series/{kinopoisk_id}/video/{trailer_id}/"
+    else:
+        normalized_url = f"https://www.kinopoisk.ru/film/{kinopoisk_id}/"
+        if trailer_id:
+            trailer_url = f"https://www.kinopoisk.ru/film/{kinopoisk_id}/video/{trailer_id}/"
 
     return {
         'kinopoisk_id': kinopoisk_id,
@@ -253,6 +260,120 @@ def _parse_suggest_movie(movie: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _parse_tvseries_graphql_response(data: Dict[str, Any], kinopoisk_id: str) -> Dict[str, Any]:
+    """Convert GraphQL TvSeries response to our standard movie dict.
+
+    Raises:
+        KinopoiskParserError: If essential data (title) is missing.
+    """
+    tv = data.get("tvSeries")
+    if not tv:
+        raise KinopoiskParserError("Сериал не найден на Кинопоиске")
+
+    title_data = tv.get("title") or {}
+    title = title_data.get("russian") or title_data.get("original")
+    if not title:
+        raise KinopoiskParserError("Не удалось извлечь название сериала")
+
+    year = _extract_year_for_serial(tv)
+    year_end = _extract_year_end(tv)
+
+    genres_list = tv.get("genres") or []
+    genre_names = [g["name"] for g in genres_list if g.get("name")]
+    genres_str = ", ".join(genre_names) if genre_names else None
+
+    description = tv.get("shortDescription") or tv.get("synopsis")
+
+    gallery = tv.get("gallery") or {}
+    posters = gallery.get("posters") or {}
+    vertical = (
+        posters.get("marketingVertical")
+        or posters.get("kpVertical")
+        or posters.get("vertical")
+        or {}
+    )
+    poster_url = _build_poster_url(
+        vertical.get("avatarsUrl"),
+        vertical.get("fallbackUrl"),
+    )
+
+    rating = None
+    rating_data = tv.get("rating") or {}
+    kp_rating = rating_data.get("kinopoisk") or {}
+    rating_value = kp_rating.get("value")
+    if rating_value is not None:
+        try:
+            rating = float(rating_value)
+        except (ValueError, TypeError):
+            pass
+
+    trailer_url = None
+    main_trailer = tv.get("mainTrailer") or {}
+    trailer_id = main_trailer.get("id")
+    if trailer_id:
+        trailer_url = f"https://www.kinopoisk.ru/series/{kinopoisk_id}/video/{trailer_id}/"
+
+    return {
+        'kinopoisk_id': kinopoisk_id,
+        'kinopoisk_url': f"https://www.kinopoisk.ru/series/{kinopoisk_id}/",
+        'title': title,
+        'year': year,
+        'year_end': year_end,
+        'type': 'serial',
+        'genres': genres_str,
+        'description': description,
+        'poster_url': poster_url,
+        'kinopoisk_rating': rating,
+        'trailer_url': trailer_url,
+    }
+
+
+async def _fetch_tvseries_via_graphql(kinopoisk_id: str) -> Dict[str, Any]:
+    """Fetch TvSeries data from Kinopoisk GraphQL API."""
+    tv_id = int(kinopoisk_id)
+    variables = {**TV_SERIES_BASE_INFO_VARIABLES_TEMPLATE, "tvSeriesId": tv_id}
+    payload = {
+        "operationName": "TvSeriesBaseInfo",
+        "variables": variables,
+        "query": TV_SERIES_BASE_INFO_QUERY,
+    }
+
+    try:
+        async with aiohttp.ClientSession(headers=GRAPHQL_HEADERS) as session:
+            async with session.post(
+                TV_SERIES_BASE_INFO_URL,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=_HTTP_TIMEOUT),
+            ) as response:
+                if response.status != 200:
+                    body_text = (await response.text())[:300]
+                    logger.error("TvSeriesBaseInfo HTTP %d: %s", response.status, body_text)
+                    raise KinopoiskParserError(
+                        f"Кинопоиск GraphQL вернул HTTP {response.status}"
+                    )
+
+                body = await response.json()
+
+                if "errors" in body and not body.get("data"):
+                    errors_text = json.dumps(body["errors"], ensure_ascii=False)[:300]
+                    logger.error("GraphQL errors: %s", errors_text)
+                    raise KinopoiskParserError("Ошибка GraphQL Кинопоиска")
+
+                data = body.get("data")
+                if not data:
+                    raise KinopoiskParserError("Пустой ответ от GraphQL Кинопоиска")
+
+                return _parse_tvseries_graphql_response(data, kinopoisk_id)
+
+    except KinopoiskParserError:
+        raise
+    except Exception as exc:
+        logger.error("TvSeriesBaseInfo request failed: %s", exc)
+        raise KinopoiskParserError(
+            "Не удалось получить данные сериала с Кинопоиска"
+        ) from exc
+
+
 async def _fetch_movie_via_graphql(kinopoisk_id: str) -> Dict[str, Any]:
     """Fetch movie data from Kinopoisk GraphQL API."""
     film_id = int(kinopoisk_id)
@@ -311,15 +432,25 @@ async def parse_movie_data(url: str) -> Dict[str, Any]:
     if not kinopoisk_id:
         raise KinopoiskParserError("Не удалось извлечь ID фильма из URL")
 
-    result = await _fetch_movie_via_graphql(kinopoisk_id)
+    if '/series/' in url:
+        result = await _fetch_tvseries_via_graphql(kinopoisk_id)
+    else:
+        result = await _fetch_movie_via_graphql(kinopoisk_id)
     logger.info("Movie '%s' fetched via GraphQL", result.get('title'))
     return result
 
 
 async def get_movie_by_id(kinopoisk_id: str) -> Dict[str, Any]:
-    """Fetch full movie/serial data by Kinopoisk ID (without URL)."""
+    """Fetch full movie data by Kinopoisk ID (without URL)."""
     result = await _fetch_movie_via_graphql(kinopoisk_id)
     logger.info("Movie '%s' fetched by ID %s", result.get('title'), kinopoisk_id)
+    return result
+
+
+async def get_series_by_id(kinopoisk_id: str) -> Dict[str, Any]:
+    """Fetch full TvSeries data by Kinopoisk ID (without URL)."""
+    result = await _fetch_tvseries_via_graphql(kinopoisk_id)
+    logger.info("Series '%s' fetched by ID %s", result.get('title'), kinopoisk_id)
     return result
 
 

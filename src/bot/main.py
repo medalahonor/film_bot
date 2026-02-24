@@ -10,7 +10,6 @@ from aiogram.types import BotCommand, BotCommandScopeAllGroupChats, BotCommandSc
 
 from bot.config import config
 from bot.middlewares import AccessCheckMiddleware, ErrorLoggingMiddleware
-from bot.database import init_db
 from bot.log_handler import InMemoryLogHandler
 
 # Import handlers
@@ -60,13 +59,6 @@ async def main() -> None:
         logger.info("Configuration validated successfully")
     except ValueError as e:
         logger.error("Configuration error: %s", e)
-        sys.exit(1)
-
-    try:
-        await init_db()
-        logger.info("Database initialized successfully")
-    except Exception as e:
-        logger.error("Database initialization error: %s", e)
         sys.exit(1)
 
     bot = Bot(

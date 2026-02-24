@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.dependencies import get_db, get_current_user
 from api.schemas.leaderboard import ClubStats, LeaderboardEntry, LeaderboardResponse
 from api.schemas.movie import MovieResponse
-from bot.database.models import Movie, Rating, Session, SessionStatus, User, Vote
-from bot.database.status_manager import STATUS_COMPLETED
+from api.database.models import Movie, Rating, Session, SessionStatus, User, Vote
+from api.database.status_manager import STATUS_COMPLETED
 
 router = APIRouter(prefix="/api/leaderboard", tags=["leaderboard"])
 

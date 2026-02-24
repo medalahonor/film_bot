@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { suggestSearch, getMovieById, parseMovieUrl } from '../api/kinopoisk';
+import { suggestSearch, getMovieById, getSeriesById, parseMovieUrl } from '../api/kinopoisk';
 import { getErrorMessage } from '../api/client';
 import type { SuggestResult, MovieFull } from '../types';
 
@@ -58,6 +58,7 @@ interface UseMovieDetailResult {
   loading: boolean;
   error: string | null;
   fetchById: (id: string) => Promise<void>;
+  fetchSeriesById: (id: string) => Promise<void>;
   fetchByUrl: (url: string) => Promise<void>;
   reset: () => void;
 }
@@ -73,6 +74,19 @@ export const useMovieDetail = (): UseMovieDetailResult => {
     setError(null);
     try {
       const data = await getMovieById(id);
+      setMovie(data);
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchSeriesById = useCallback(async (id: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getSeriesById(id);
       setMovie(data);
     } catch (e) {
       setError(getErrorMessage(e));
@@ -99,5 +113,5 @@ export const useMovieDetail = (): UseMovieDetailResult => {
     setError(null);
   }, []);
 
-  return { movie, loading, error, fetchById, fetchByUrl, reset };
+  return { movie, loading, error, fetchById, fetchSeriesById, fetchByUrl, reset };
 };

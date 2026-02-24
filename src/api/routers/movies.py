@@ -9,8 +9,8 @@ from api.config import config
 from api.dependencies import get_db, get_current_user
 from api.schemas.movie import MovieResponse, ProposeMovieRequest, ReplaceMovieRequest, UpdateClubRatingRequest
 from api.telegram_notify import notify_movie_proposed
-from bot.database.models import Movie, Session, SessionStatus, User
-from bot.database.status_manager import STATUS_COLLECTING
+from api.database.models import Movie, Session, SessionStatus, User
+from api.database.status_manager import STATUS_COLLECTING
 
 router = APIRouter(prefix="/api/movies", tags=["movies"])
 

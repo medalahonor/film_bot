@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Response
 
 from api.config import config
 from api.dependencies import get_current_user
-from bot.database.models import User
+from api.database.models import User
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 

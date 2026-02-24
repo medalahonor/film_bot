@@ -4,10 +4,11 @@ from typing import List
 
 from api.dependencies import get_current_user
 from api.schemas.kinopoisk import KinopoiskParseRequest, MovieFullResponse, SuggestResult
-from bot.database.models import User
-from bot.services.kinopoisk import (
+from api.database.models import User
+from api.services.kinopoisk import (
     KinopoiskParserError,
     get_movie_by_id,
+    get_series_by_id,
     parse_movie_data,
     suggest_search,
 )
@@ -37,7 +38,7 @@ async def kinopoisk_suggest(
     _user: User = Depends(get_current_user),
 ) -> List[SuggestResult]:
     try:
-        results = await suggest_search(query, limit=3)
+        results = await suggest_search(query, limit=5)
     except KinopoiskParserError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     return [SuggestResult(**r) for r in results]
@@ -50,6 +51,18 @@ async def kinopoisk_movie_by_id(
 ) -> MovieFullResponse:
     try:
         data = await get_movie_by_id(kinopoisk_id)
+    except KinopoiskParserError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return _to_movie_full(data)
+
+
+@router.get("/series/{kinopoisk_id}", response_model=MovieFullResponse)
+async def kinopoisk_series_by_id(
+    kinopoisk_id: str,
+    _user: User = Depends(get_current_user),
+) -> MovieFullResponse:
+    try:
+        data = await get_series_by_id(kinopoisk_id)
     except KinopoiskParserError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     return _to_movie_full(data)

@@ -3,7 +3,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.database.models import SessionStatus
+from api.database.models import SessionStatus
 
 
 # Status codes
@@ -15,11 +15,11 @@ STATUS_COMPLETED = "completed"
 
 async def get_status_by_code(db: AsyncSession, code: str) -> Optional[SessionStatus]:
     """Get session status by code.
-    
+
     Args:
         db: Database session
         code: Status code
-        
+
     Returns:
         SessionStatus object or None
     """
@@ -31,7 +31,7 @@ async def get_status_by_code(db: AsyncSession, code: str) -> Optional[SessionSta
 
 async def init_statuses(db: AsyncSession) -> None:
     """Initialize default session statuses in database.
-    
+
     Args:
         db: Database session
     """
@@ -57,7 +57,7 @@ async def init_statuses(db: AsyncSession) -> None:
             "description": "Сессия завершена"
         }
     ]
-    
+
     for status_data in statuses:
         # Check if status exists
         existing = await get_status_by_code(db, status_data["code"])
@@ -68,5 +68,5 @@ async def init_statuses(db: AsyncSession) -> None:
                 description=status_data["description"]
             )
             db.add(status)
-    
+
     await db.commit()
