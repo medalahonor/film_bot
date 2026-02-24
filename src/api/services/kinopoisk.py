@@ -192,13 +192,12 @@ def _parse_graphql_response(data: Dict[str, Any], kinopoisk_id: str) -> Dict[str
     trailer_id = main_trailer.get("id")
     if content_type == 'serial':
         normalized_url = f"https://www.kinopoisk.ru/series/{kinopoisk_id}/"
-        if trailer_id:
-            trailer_url = f"https://www.kinopoisk.ru/series/{kinopoisk_id}/video/{trailer_id}/"
     else:
         normalized_url = f"https://www.kinopoisk.ru/film/{kinopoisk_id}/"
-        if trailer_id:
-            trailer_url = f"https://www.kinopoisk.ru/film/{kinopoisk_id}/video/{trailer_id}/"
 
+    if trailer_id:
+        trailer_url = f"https://www.kinopoisk.ru/film/{kinopoisk_id}/video/{trailer_id}/"
+    
     return {
         'kinopoisk_id': kinopoisk_id,
         'kinopoisk_url': normalized_url,
@@ -311,7 +310,7 @@ def _parse_tvseries_graphql_response(data: Dict[str, Any], kinopoisk_id: str) ->
     main_trailer = tv.get("mainTrailer") or {}
     trailer_id = main_trailer.get("id")
     if trailer_id:
-        trailer_url = f"https://www.kinopoisk.ru/series/{kinopoisk_id}/video/{trailer_id}/"
+        trailer_url = f"https://www.kinopoisk.ru/film/{kinopoisk_id}/video/{trailer_id}/"
 
     return {
         'kinopoisk_id': kinopoisk_id,
