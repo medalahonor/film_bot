@@ -347,21 +347,34 @@ async def suggest_search(query: str, limit: int = 3) -> List[Dict[str, Any]]:
                     raise KinopoiskParserError(f"Кинопоиск вернул HTTP {response.status}")
 
                 body = await response.json()
-                movies_raw = (
-                    body.get("data", {})
-                    .get("suggest", {})
-                    .get("top", {})
-                    .get("movies", [])
-                )
+                top = body.get("data", {}).get("suggest", {}).get("top", {})
+                top_result_raw = (top.get("topResult") or {}).get("global")
+                movies_raw = top.get("movies", [])
 
-                results = []
+                _movie_typenames = ('Film', 'TvSeries', 'TvShow', 'MiniSeries')
+                results: List[Dict[str, Any]] = []
+                seen_ids: set = set()
+
+                if (
+                    top_result_raw
+                    and top_result_raw.get("__typename") in _movie_typenames
+                    and top_result_raw.get("id")
+                ):
+                    parsed = _parse_suggest_movie(top_result_raw)
+                    results.append(parsed)
+                    seen_ids.add(parsed["kinopoisk_id"])
+
                 for item in movies_raw:
+                    if len(results) >= limit:
+                        break
                     movie = item.get("movie") if isinstance(item, dict) else item
                     if not movie or not movie.get("id"):
                         continue
+                    kid = str(movie["id"])
+                    if kid in seen_ids:
+                        continue
                     results.append(_parse_suggest_movie(movie))
-                    if len(results) >= limit:
-                        break
+                    seen_ids.add(kid)
 
                 return results
 
