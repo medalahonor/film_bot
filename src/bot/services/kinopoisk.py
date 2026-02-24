@@ -233,10 +233,10 @@ def _parse_suggest_movie(movie: Dict[str, Any]) -> Dict[str, Any]:
         except (ValueError, TypeError):
             pass
 
-    # Poster
+    # Poster — новый запрос возвращает hdVertical/kpVertical (алиасы)
     gallery = movie.get('gallery') or {}
     posters = gallery.get('posters') or {}
-    vertical = posters.get('vertical') or {}
+    vertical = posters.get('hdVertical') or posters.get('kpVertical') or posters.get('vertical') or {}
     poster_url = _build_poster_url(
         vertical.get('avatarsUrl'),
         vertical.get('fallbackUrl'),
@@ -330,7 +330,7 @@ async def suggest_search(query: str, limit: int = 3) -> List[Dict[str, Any]]:
     """
     payload = {
         "operationName": "SuggestSearch",
-        "variables": {"queryText": query, "isAuthorized": False, "limit": limit},
+        "variables": {"keyword": query, "yandexCityId": 100, "limit": limit},
         "query": SUGGEST_SEARCH_QUERY,
     }
 
