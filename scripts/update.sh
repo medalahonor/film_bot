@@ -21,7 +21,7 @@ docker compose build --progress plain
 
 echo ""
 echo "=== Запускаем контейнеры ==="
-docker compose up -d --progress plain
+docker compose --progress plain up -d 
 
 # ─── 3. Перезагрузка nginx если изменился nginx/ ──────────────────────────────
 
