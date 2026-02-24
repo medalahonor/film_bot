@@ -32,6 +32,20 @@ input {
   font-family: inherit;
 }
 
+/* Auth loading spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.auth-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--tg-theme-hint-color, #ccc);
+  border-top-color: var(--tg-theme-button-color, #007aff);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 4px;

@@ -15,6 +15,7 @@ const App: React.FC = () => {
   useTelegramInit();
 
   const isAccessDenied = useAppStore((s) => s.isAccessDenied);
+  const isAuthLoading = useAppStore((s) => s.isAuthLoading);
   const setAccessDenied = useAppStore((s) => s.setAccessDenied);
 
   // Listen for global 403 events from the API client
@@ -23,6 +24,21 @@ const App: React.FC = () => {
     window.addEventListener('filmbot:access-denied', handler);
     return () => window.removeEventListener('filmbot:access-denied', handler);
   }, [setAccessDenied]);
+
+  if (isAuthLoading) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100dvh',
+        }}
+      >
+        <div className="auth-spinner" />
+      </div>
+    );
+  }
 
   if (isAccessDenied) {
     return <AccessDeniedPage />;

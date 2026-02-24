@@ -83,7 +83,7 @@ export const useTelegram = () => {
 /** Initialize Telegram WebApp and populate global state. Call once in App root. */
 export const useTelegramInit = () => {
   const { tg, user } = useTelegram();
-  const { setCurrentUser, setIsAdmin } = useAppStore();
+  const { setCurrentUser, setIsAdmin, setAuthLoading } = useAppStore();
 
   useEffect(() => {
     if (tg) {
@@ -96,7 +96,13 @@ export const useTelegramInit = () => {
     }
 
     getMe()
-      .then(({ is_admin }) => setIsAdmin(is_admin))
-      .catch(() => {}); // 403 → filmbot:access-denied event handles it
+      .then(({ is_admin }) => {
+        setIsAdmin(is_admin);
+        setAuthLoading(false);
+      })
+      .catch(() => {
+        setAuthLoading(false);
+        // 403 → filmbot:access-denied event handles it
+      });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 };
