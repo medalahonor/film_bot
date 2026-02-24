@@ -17,11 +17,11 @@ git pull
 
 echo ""
 echo "=== Собираем образы ==="
-docker compose build
+docker compose build --progress plain
 
 echo ""
 echo "=== Запускаем контейнеры ==="
-docker compose up -d
+docker compose up -d --progress plain
 
 # ─── 3. Перезагрузка nginx если изменился nginx/ ──────────────────────────────
 
