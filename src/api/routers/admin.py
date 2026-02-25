@@ -1,5 +1,6 @@
 """Admin API routes."""
 import json
+import math
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -205,6 +206,7 @@ def _movie_to_response(movie: Movie) -> MovieResponse:
         trailer_url=getattr(movie, 'trailer_url', None),
         proposer_username=movie.proposer.username if movie.proposer else None,
         proposer_first_name=movie.proposer.first_name if movie.proposer else None,
+        proposer_telegram_id=movie.proposer.telegram_id if movie.proposer else None,
         created_at=movie.created_at,
     )
 
@@ -227,6 +229,122 @@ async def list_session_movies(
         )).scalars().all()
     )
     return [_movie_to_response(m) for m in movies]
+
+
+@router.post("/sessions/{session_id}/movies", response_model=MovieResponse, status_code=201)
+async def add_movie_to_session(
+    session_id: int,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_admin),
+) -> MovieResponse:
+    """Add a movie to a session slot (admin only, session must be in collecting status)."""
+    session_result = await db.execute(select(Session).where(Session.id == session_id))
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.status != "collecting":
+        raise HTTPException(status_code=400, detail="Session must be in collecting status")
+    slot = body.get("slot")
+    if slot not in (1, 2):
+        raise HTTPException(status_code=422, detail="slot must be 1 or 2")
+    kinopoisk_id = body.get("kinopoisk_id", "")
+    if not kinopoisk_id:
+        raise HTTPException(status_code=422, detail="kinopoisk_id is required")
+    existing = await db.execute(
+        select(Movie).where(Movie.session_id == session_id, Movie.kinopoisk_id == kinopoisk_id)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Movie already exists in this session")
+    movie = Movie(
+        session_id=session_id,
+        user_id=admin.id,
+        slot=slot,
+        kinopoisk_url=body.get("kinopoisk_url", ""),
+        kinopoisk_id=kinopoisk_id,
+        title=body.get("title", ""),
+        year=body.get("year"),
+        year_end=body.get("year_end"),
+        type=body.get("type", "film"),
+        genres=body.get("genres"),
+        description=body.get("description"),
+        poster_url=body.get("poster_url"),
+        kinopoisk_rating=Decimal(str(body["kinopoisk_rating"])) if body.get("kinopoisk_rating") else None,
+        trailer_url=body.get("trailer_url"),
+    )
+    db.add(movie)
+    await db.commit()
+    await db.refresh(movie)
+    return _movie_to_response(movie)
+
+
+@router.post("/movies", response_model=MovieResponse, status_code=201)
+async def add_library_movie(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(get_admin),
+) -> MovieResponse:
+    """Add a movie to the global library (not tied to any session)."""
+    kinopoisk_id = body.get("kinopoisk_id", "")
+    if not kinopoisk_id:
+        raise HTTPException(status_code=422, detail="kinopoisk_id is required")
+    existing = await db.execute(
+        select(Movie).where(Movie.session_id == None, Movie.kinopoisk_id == kinopoisk_id)  # noqa: E711
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Movie already exists in library")
+    from decimal import Decimal as _Decimal
+    movie = Movie(
+        session_id=None,
+        user_id=None,
+        slot=None,
+        kinopoisk_url=body.get("kinopoisk_url", ""),
+        kinopoisk_id=kinopoisk_id,
+        title=body.get("title", ""),
+        year=body.get("year"),
+        year_end=body.get("year_end"),
+        type=body.get("type", "film"),
+        genres=body.get("genres"),
+        description=body.get("description"),
+        poster_url=body.get("poster_url"),
+        kinopoisk_rating=_Decimal(str(body["kinopoisk_rating"])) if body.get("kinopoisk_rating") else None,
+        club_rating=_Decimal(str(body["club_rating"])) if body.get("club_rating") else None,
+        trailer_url=body.get("trailer_url"),
+    )
+    db.add(movie)
+    await db.commit()
+    await db.refresh(movie)
+    return _movie_to_response(movie)
+
+
+@router.get("/movies")
+async def list_all_movies(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=100),
+    search: Optional[str] = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(get_admin),
+) -> dict:
+    """List all movies across all sessions with pagination and optional title search."""
+    from sqlalchemy import func
+    count_q = select(func.count(Movie.id))
+    movies_q = select(Movie)
+    if search:
+        count_q = count_q.where(Movie.title.ilike(f'%{search}%'))
+        movies_q = movies_q.where(Movie.title.ilike(f'%{search}%'))
+    total = (await db.execute(count_q)).scalar() or 0
+    movies = list(
+        (await db.execute(
+            movies_q.order_by(Movie.id.desc()).offset((page - 1) * per_page).limit(per_page)
+        )).scalars().all()
+    )
+    pages = math.ceil(total / per_page) if total > 0 else 1
+    return {
+        "items": [_movie_to_response(m).model_dump() for m in movies],
+        "total": total,
+        "page": page,
+        "pages": pages,
+    }
 
 
 @router.post("/batch-import", status_code=200)

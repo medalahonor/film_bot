@@ -132,9 +132,9 @@ class Movie(Base):
     __tablename__ = "movies"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    session_id: Mapped[int] = mapped_column(ForeignKey("sessions.id"), nullable=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    slot: Mapped[int] = mapped_column(Integer, nullable=False)  # 1 or 2
+    session_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sessions.id"), nullable=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    slot: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 1 or 2; None for library entries
     kinopoisk_url: Mapped[str] = mapped_column(String(500), nullable=False)
     kinopoisk_id: Mapped[str] = mapped_column(String(100), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
@@ -150,13 +150,13 @@ class Movie(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    session: Mapped["Session"] = relationship(
+    session: Mapped[Optional["Session"]] = relationship(
         "Session",
         back_populates="movies",
         foreign_keys=[session_id],
         lazy="selectin",
     )
-    proposer: Mapped["User"] = relationship("User", back_populates="movies", lazy="selectin")
+    proposer: Mapped[Optional["User"]] = relationship("User", back_populates="movies", lazy="selectin")
     votes: Mapped[List["Vote"]] = relationship("Vote", back_populates="movie", lazy="selectin")
     ratings: Mapped[List["Rating"]] = relationship("Rating", back_populates="movie", lazy="selectin")
 

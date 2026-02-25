@@ -4,8 +4,8 @@ export type SessionStatus = 'collecting' | 'voting' | 'rating' | 'completed';
 
 export interface Movie {
   id: number;
-  session_id: number;
-  slot: number;
+  session_id: number | null;
+  slot: number | null;
   kinopoisk_id: string;
   kinopoisk_url: string;
   title: string;

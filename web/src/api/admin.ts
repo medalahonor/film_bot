@@ -75,6 +75,46 @@ export const updateClubRating = (movieId: number, clubRating: number): Promise<M
     .patch<Movie>(`/movies/${movieId}/rating`, { club_rating: clubRating })
     .then((r) => r.data);
 
+export interface MoviePageResponse {
+  items: Movie[];
+  total: number;
+  page: number;
+  pages: number;
+}
+
+export interface AddMovieRequest {
+  kinopoisk_id: string;
+  kinopoisk_url: string;
+  title: string;
+  year?: number | null;
+  year_end?: number | null;
+  type: 'film' | 'serial';
+  genres?: string | null;
+  description?: string | null;
+  poster_url?: string | null;
+  kinopoisk_rating?: number | null;
+  trailer_url?: string | null;
+}
+
+export const addMovieToSession = (
+  sessionId: number,
+  slot: 1 | 2,
+  data: AddMovieRequest,
+): Promise<Movie> =>
+  client.post<Movie>(`/admin/sessions/${sessionId}/movies`, { ...data, slot }).then((r) => r.data);
+
+export const addLibraryMovie = (
+  data: AddMovieRequest & { club_rating?: number },
+): Promise<Movie> =>
+  client.post<Movie>('/admin/movies', data).then((r) => r.data);
+
+export const getAdminMovies = (page = 1, search = ''): Promise<MoviePageResponse> =>
+  client
+    .get<MoviePageResponse>('/admin/movies', {
+      params: { page, per_page: 20, ...(search ? { search } : {}) },
+    })
+    .then((r) => r.data);
+
 // ---------------------------------------------------------------------------
 // Stats
 // ---------------------------------------------------------------------------

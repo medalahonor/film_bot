@@ -41,8 +41,8 @@ class ReplaceMovieRequest(BaseModel):
 
 class MovieResponse(BaseModel):
     id: int
-    session_id: int
-    slot: int
+    session_id: Optional[int]
+    slot: Optional[int]
     kinopoisk_id: str
     kinopoisk_url: str
     title: str
