@@ -99,11 +99,12 @@ cd "$PROJECT_DIR"
 source "$SCRIPT_DIR/lib.sh"
 
 # Загружаем базовые образы в локальный кеш (только при отсутствии).
-# DOCKER_BUILDKIT=0 переключает на классический builder: в отличие от BuildKit,
-# он не обращается к Docker Hub за манифестом образа (load metadata) и не вызывает
-# rate limit 429. Классический builder доступен в Docker 29 (deprecated, но не удалён).
+# --pull=false запрещает BuildKit проверять реестр за манифестом образа (load metadata),
+# что могло вызывать rate limit 429 от Docker Hub. Безопасно: ensure_base_images выше
+# уже обеспечила наличие всех базовых образов в кеше. Кеш слоёв BuildKit работает
+# в полную силу — пересборка только изменившихся слоёв.
 ensure_base_images "$PROJECT_DIR"
-DOCKER_BUILDKIT=0 docker compose build
+docker compose build --pull=false
 docker compose up -d
 
 # ─── 5. Cron для авторенивала сертификата ─────────────────────────────────────
