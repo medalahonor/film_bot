@@ -10,6 +10,7 @@ from api.dependencies import get_db, get_current_user
 from api.schemas.movie import MovieResponse, ProposeMovieRequest, ReplaceMovieRequest, UpdateClubRatingRequest
 from api.telegram_notify import notify_movie_proposed
 from api.database.models import Movie, Session, SessionStatus, User
+from api.database.repositories import get_movie_by_id, delete_movie_by_id
 from api.database.status_manager import STATUS_COLLECTING
 
 router = APIRouter(prefix="/api/movies", tags=["movies"])
@@ -186,8 +187,7 @@ async def delete_movie(
     user: User = Depends(get_current_user),
 ) -> None:
     """Delete a movie. Admin or the movie's proposer only."""
-    result = await db.execute(select(Movie).where(Movie.id == movie_id))
-    movie = result.scalar_one_or_none()
+    movie = await get_movie_by_id(db, movie_id)
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
 
@@ -195,8 +195,7 @@ async def delete_movie(
     if not is_admin and movie.user_id != user.id:
         raise HTTPException(status_code=403, detail="You can only withdraw your own movies")
 
-    await db.delete(movie)
-    await db.commit()
+    await delete_movie_by_id(db, movie_id)
 
 
 @router.patch("/{movie_id}/rating", response_model=MovieResponse)
