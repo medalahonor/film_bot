@@ -176,7 +176,9 @@ export const LeaderboardPage: React.FC = () => {
       )}
 
       {!loading &&
-        items.map(({ movie, vote_count, rating_count }, idx) => (
+        items.map(({ movie, vote_count, rating_count }, idx) => {
+          const globalIdx = idx + (page - 1) * 20;
+          return (
           <div key={movie.id}>
             <div style={{ position: 'relative' }}>
               {/* Rank badge */}
@@ -193,17 +195,17 @@ export const LeaderboardPage: React.FC = () => {
                   fontSize: 11,
                   fontWeight: 700,
                   color:
-                    idx === 0
+                    globalIdx === 0
                       ? '#f39c12'
-                      : idx === 1
+                      : globalIdx === 1
                         ? '#95a5a6'
-                        : idx === 2
+                        : globalIdx === 2
                           ? '#cd7f32'
                           : 'var(--tg-theme-hint-color, #999)',
                   zIndex: 1,
                 }}
               >
-                {idx + 1 + (page - 1) * 20}
+                {globalIdx + 1}
               </div>
               <MovieCard movie={movie} />
             </div>
@@ -227,7 +229,8 @@ export const LeaderboardPage: React.FC = () => {
               }}
             />
           </div>
-        ))}
+          );
+        })}
 
       {/* Pagination */}
       {!loading && totalPages > 1 && (

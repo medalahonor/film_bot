@@ -209,6 +209,26 @@ def _movie_to_response(movie: Movie) -> MovieResponse:
     )
 
 
+@router.get("/sessions/{session_id}/movies", response_model=List[MovieResponse])
+async def list_session_movies(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(get_admin),
+) -> List[MovieResponse]:
+    """Get all movies for any session (including completed ones)."""
+    session_result = await db.execute(select(Session).where(Session.id == session_id))
+    if not session_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Session not found")
+    movies = list(
+        (await db.execute(
+            select(Movie)
+            .where(Movie.session_id == session_id)
+            .order_by(Movie.slot, Movie.id)
+        )).scalars().all()
+    )
+    return [_movie_to_response(m) for m in movies]
+
+
 @router.post("/batch-import", status_code=200)
 async def batch_import(
     body: Dict[str, Any],

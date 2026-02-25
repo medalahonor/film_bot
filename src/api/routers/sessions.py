@@ -1,20 +1,27 @@
 """Sessions API routes."""
+import asyncio
 import json
 from datetime import datetime
-from typing import List, Optional
+from typing import AsyncGenerator, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from sqlalchemy import delete as sql_delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies import get_db, get_current_user
+from api.auth import validate_init_data
+from api.dependencies import get_admin, get_db, get_current_user
 from api.schemas.movie import MovieResponse
 from api.schemas.session import SessionResponse
+from api.session_events import notify_session_changed, subscribe, unsubscribe
 from api.telegram_notify import notify_session_status_changed
-from api.database.models import Movie, Session, SessionStatus, User
-from api.database.status_manager import STATUS_COLLECTING, STATUS_COMPLETED
+from api.database.models import Movie, Rating, Session, SessionStatus, User, Vote
+from api.database.status_manager import STATUS_COLLECTING, STATUS_COMPLETED, STATUS_RATING, STATUS_VOTING
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
+
+# Order used to detect rollback direction
+_STATUS_ORDER = {STATUS_COLLECTING: 0, STATUS_VOTING: 1, STATUS_RATING: 2, STATUS_COMPLETED: 3}
 
 
 def _movie_to_response(movie: Movie) -> MovieResponse:
@@ -73,6 +80,27 @@ async def _get_active_session(db: AsyncSession) -> Session:
     return session
 
 
+async def _clear_rollback_data(db: AsyncSession, session: Session, new_status_code: str) -> None:
+    """Clear data that no longer belongs to the rolled-back status."""
+    current_order = _STATUS_ORDER.get(session.status, -1)
+    new_order = _STATUS_ORDER.get(new_status_code, -1)
+    if new_order >= current_order:
+        return  # Not a rollback — nothing to clear
+
+    # Rolling back to voting or earlier: clear ratings, winners, runoff
+    if new_order <= _STATUS_ORDER[STATUS_VOTING]:
+        await db.execute(sql_delete(Rating).where(Rating.session_id == session.id))
+        session.winner_slot1_id = None
+        session.winner_slot2_id = None
+        session.runoff_slot1_ids = None
+        session.runoff_slot2_ids = None
+        session.completed_at = None
+
+    # Rolling back to collecting: also clear votes
+    if new_order <= _STATUS_ORDER[STATUS_COLLECTING]:
+        await db.execute(sql_delete(Vote).where(Vote.session_id == session.id))
+
+
 @router.get("/current", response_model=SessionResponse)
 async def get_current_session(
     db: AsyncSession = Depends(get_db),
@@ -97,6 +125,52 @@ async def get_current_session_movies(
         )).scalars().all()
     )
     return [_movie_to_response(m) for m in movies]
+
+
+@router.get("/events")
+async def session_events(
+    init_data: str = Query(..., description="Telegram WebApp initData"),
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    """SSE stream: pushes session-changed events to connected clients.
+
+    NOTE: Requires --workers 1. With multiple workers, in-process pub/sub
+    won't cross process boundaries. Use Redis pub/sub for multi-worker setup.
+    """
+    tg_user = validate_init_data(init_data)
+
+    from sqlalchemy import select as _select
+    from api.database.models import User as _User
+    from api.config import config
+
+    telegram_id = int(tg_user["id"])
+    result = await db.execute(_select(_User).where(_User.telegram_id == telegram_id))
+    user = result.scalar_one_or_none()
+    if not user or not user.is_allowed:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    queue: asyncio.Queue = asyncio.Queue()
+    subscribe(queue)
+
+    async def _generate() -> AsyncGenerator[str, None]:
+        try:
+            while True:
+                try:
+                    data = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"data: {json.dumps(data)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"
+        finally:
+            unsubscribe(queue)
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +206,7 @@ async def change_session_status(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> SessionResponse:
-    """Change session status."""
+    """Change session status. On rollback, clears data from future statuses."""
     new_status_code: Optional[str] = body.get("status")
     if not new_status_code:
         raise HTTPException(status_code=422, detail="status is required")
@@ -148,6 +222,8 @@ async def change_session_status(
     if not new_status:
         raise HTTPException(status_code=422, detail=f"Unknown status: {new_status_code}")
 
+    await _clear_rollback_data(db, session, new_status_code)
+
     session.status_id = new_status.id
     if new_status_code == STATUS_COMPLETED:
         session.completed_at = datetime.utcnow()
@@ -156,6 +232,7 @@ async def change_session_status(
     await db.refresh(session)
 
     await notify_session_status_changed(new_status=new_status_code)
+    await notify_session_changed(_session_to_response(session).model_dump(mode="json"))
 
     return _session_to_response(session)
 
@@ -164,18 +241,18 @@ async def change_session_status(
 async def delete_session(
     session_id: int,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user: User = Depends(get_admin),
 ) -> None:
-    """Mark session as completed (soft delete)."""
+    """Hard-delete a session and all its data (movies, votes, ratings). Admin only."""
     result = await db.execute(select(Session).where(Session.id == session_id))
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    completed_status = (
-        await db.execute(select(SessionStatus).where(SessionStatus.code == STATUS_COMPLETED))
-    ).scalar_one_or_none()
-    if completed_status:
-        session.status_id = completed_status.id
-        session.completed_at = datetime.utcnow()
-        await db.commit()
+    await db.execute(sql_delete(Rating).where(Rating.session_id == session_id))
+    await db.execute(sql_delete(Vote).where(Vote.session_id == session_id))
+    await db.execute(sql_delete(Movie).where(Movie.session_id == session_id))
+    await db.delete(session)
+    await db.commit()
+
+    await notify_session_changed({"deleted": True, "id": session_id})

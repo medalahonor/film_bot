@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useSession } from '../../hooks/useSession';
-import { createSession } from '../../api/admin';
+import { createSession, changeSessionStatus } from '../../api/admin';
+import { finalizeVotes } from '../../api/votes';
 import { Loader } from '../../components/Loader';
 import { MovieCard } from '../../components/MovieCard';
 import type { Movie, SessionStatus } from '../../types';
@@ -12,11 +13,22 @@ const STATUS_LABELS: Record<SessionStatus, string> = {
   completed: 'Завершена',
 };
 
+const STATUS_NEXT_LABEL: Partial<Record<SessionStatus, string>> = {
+  collecting: '→ Начать голосование',
+  voting: '→ Подвести итоги',
+  rating: '→ Завершить сессию',
+};
+
 const STATUS_COLORS: Record<SessionStatus, string> = {
   collecting: '#27ae60',
   voting: '#2481cc',
   rating: '#f39c12',
   completed: '#95a5a6',
+};
+
+const STATUS_NEXT: Partial<Record<SessionStatus, SessionStatus>> = {
+  collecting: 'voting',
+  rating: 'completed',
 };
 
 const StatusBadge: React.FC<{ status: SessionStatus }> = ({ status }) => (
@@ -83,6 +95,8 @@ const Divider: React.FC = () => (
 export const SessionPage: React.FC = () => {
   const { session, movies, loading, error, refresh } = useSession();
   const [creating, setCreating] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
+  const [advanceMsg, setAdvanceMsg] = useState<string | null>(null);
 
   const handleCreateSession = useCallback(async () => {
     setCreating(true);
@@ -93,6 +107,29 @@ export const SessionPage: React.FC = () => {
       setCreating(false);
     }
   }, [refresh]);
+
+  const handleAdvance = useCallback(async () => {
+    if (!session) return;
+    setAdvancing(true);
+    setAdvanceMsg(null);
+    try {
+      if (session.status === 'voting') {
+        const result = await finalizeVotes(session.id);
+        if (result.runoff_slot1_ids || result.runoff_slot2_ids) {
+          setAdvanceMsg('⚡ Ничья! Запущено переголосование');
+        }
+      } else {
+        const next = STATUS_NEXT[session.status as SessionStatus];
+        if (next) await changeSessionStatus(session.id, next);
+      }
+      await refresh();
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setAdvanceMsg(detail ?? 'Ошибка при переходе');
+    } finally {
+      setAdvancing(false);
+    }
+  }, [session, refresh]);
 
   const slot1Movies = useMemo(
     () => movies.filter((m) => m.slot === 1),
@@ -141,6 +178,8 @@ export const SessionPage: React.FC = () => {
       </div>
     );
   }
+
+  const nextLabel = session ? STATUS_NEXT_LABEL[session.status as SessionStatus] : undefined;
 
   return (
     <div>
@@ -230,6 +269,32 @@ export const SessionPage: React.FC = () => {
           <Divider />
           <SlotSection slot={2} movies={slot2Movies} />
         </>
+      )}
+
+      {/* Advance phase button (visible to all users) */}
+      {session && nextLabel && (
+        <div style={{ padding: '12px 16px 24px' }}>
+          {advanceMsg && (
+            <p style={{ fontSize: 13, color: '#e74c3c', marginBottom: 8 }}>{advanceMsg}</p>
+          )}
+          <button
+            onClick={handleAdvance}
+            disabled={advancing}
+            style={{
+              width: '100%',
+              padding: '13px 0',
+              backgroundColor: 'transparent',
+              color: advancing ? 'var(--tg-theme-hint-color, #999)' : 'var(--tg-theme-button-color, #2481cc)',
+              border: '1px solid currentColor',
+              borderRadius: 10,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: advancing ? 'default' : 'pointer',
+            }}
+          >
+            {advancing ? 'Переходим…' : nextLabel}
+          </button>
+        </div>
       )}
     </div>
   );

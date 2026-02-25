@@ -11,9 +11,9 @@ import {
   deleteSession,
   getAdminLogs,
   getAdminSessions,
+  getAdminSessionMovies,
   getAdminUsers,
   getDbStats,
-  getSessionMovies,
   getPendingUsers,
   setSessionWinner,
   updateClubRating,
@@ -155,10 +155,10 @@ const SessionsTab: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm('Отменить сессию?')) return;
+    if (!window.confirm('Удалить сессию и все её данные (фильмы, голоса, оценки)?')) return;
     try {
       await deleteSession(id);
-      setMsg('Сессия отменена');
+      setMsg('Сессия удалена');
       load();
     } catch {
       setMsg('Ошибка удаления');
@@ -223,31 +223,47 @@ const SessionsTab: React.FC = () => {
 // ---------------------------------------------------------------------------
 
 const MoviesTab: React.FC = () => {
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState('');
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
   const [editRating, setEditRating] = useState<Record<number, string>>({});
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    getAdminSessions()
+      .then((data) => {
+        setSessions(data);
+        if (data.length > 0) setSelectedSessionId(String(data[0].id));
+      })
+      .catch(() => {});
+  }, []);
+
+  const load = useCallback(async (sessionId: string) => {
+    if (!sessionId) return;
     setLoading(true);
+    setMsg('');
     try {
-      const data = await getSessionMovies();
+      const data = await getAdminSessionMovies(parseInt(sessionId, 10));
       setMovies(data);
     } catch {
-      setMsg('Ошибка загрузки фильмов (нет активной сессии?)');
+      setMsg('Ошибка загрузки фильмов');
+      setMovies([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (selectedSessionId) load(selectedSessionId);
+  }, [selectedSessionId, load]);
 
   const handleDelete = async (id: number) => {
     if (!window.confirm('Удалить фильм из сессии?')) return;
     try {
       await deleteMovie(id);
       setMsg('Удалено');
-      load();
+      load(selectedSessionId);
     } catch {
       setMsg('Ошибка удаления');
     }
@@ -260,18 +276,37 @@ const MoviesTab: React.FC = () => {
       await updateClubRating(id, val);
       setMsg('Оценка обновлена');
       setEditRating((prev) => { const n = { ...prev }; delete n[id]; return n; });
-      load();
+      load(selectedSessionId);
     } catch {
       setMsg('Ошибка');
     }
   };
 
+  const selectStyle: React.CSSProperties = {
+    width: '100%', padding: '6px 10px', borderRadius: 8, marginBottom: 10,
+    border: '1px solid var(--tg-theme-secondary-bg-color, #ccc)', fontSize: 13,
+    background: 'var(--tg-theme-bg-color, #fff)',
+    color: 'var(--tg-theme-text-color, #000)',
+  };
+
   return (
     <div>
-      <p style={sectionTitle}>Фильмы активной сессии</p>
+      <p style={sectionTitle}>Фильмы сессии</p>
+      <select
+        style={selectStyle}
+        value={selectedSessionId}
+        onChange={(e) => setSelectedSessionId(e.target.value)}
+      >
+        <option value="">— Выберите сессию —</option>
+        {sessions.map((s) => (
+          <option key={s.id} value={s.id}>
+            #{s.id} {STATUS_LABELS[s.status] ?? s.status} ({new Date(s.created_at).toLocaleDateString('ru')})
+          </option>
+        ))}
+      </select>
       {msg && <p style={{ color: '#e74c3c', fontSize: 13, marginBottom: 8 }}>{msg}</p>}
       {loading && <p style={{ color: 'var(--tg-theme-hint-color)' }}>Загрузка…</p>}
-      {!loading && movies.length === 0 && (
+      {!loading && selectedSessionId && movies.length === 0 && (
         <p style={{ color: 'var(--tg-theme-hint-color)', fontSize: 13 }}>Нет фильмов</p>
       )}
       {movies.map((m) => (

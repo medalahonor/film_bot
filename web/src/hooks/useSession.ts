@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useAppStore } from '../store/useAppStore';
 import { getCurrentSession, getSessionMovies } from '../api/sessions';
@@ -20,6 +20,7 @@ export const useSession = (): UseSessionResult => {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const esRef = useRef<EventSource | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -44,9 +45,38 @@ export const useSession = (): UseSessionResult => {
     }
   }, [setCurrentSession]);
 
+  // Initial load
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // Keep a ref to latest refresh so the SSE handler never goes stale
+  const refreshRef = useRef(refresh);
+  useEffect(() => { refreshRef.current = refresh; }, [refresh]);
+
+  // SSE subscription for real-time session updates
+  useEffect(() => {
+    const initData = window.Telegram?.WebApp?.initData;
+    if (!initData) return;
+
+    const url = `/api/sessions/events?init_data=${encodeURIComponent(initData)}`;
+    const es = new EventSource(url);
+    esRef.current = es;
+
+    es.onmessage = () => {
+      // Re-fetch full session + movies to get consistent state
+      refreshRef.current();
+    };
+
+    es.onerror = () => {
+      // Browser auto-reconnects on error
+    };
+
+    return () => {
+      es.close();
+      esRef.current = null;
+    };
+  }, []);
 
   return { session, movies, loading, error, refresh };
 };

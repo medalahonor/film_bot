@@ -64,6 +64,9 @@ export const setSessionWinner = (
 export const getSessionMovies = (): Promise<Movie[]> =>
   client.get<Movie[]>('/sessions/current/movies').then((r) => r.data);
 
+export const getAdminSessionMovies = (sessionId: number): Promise<Movie[]> =>
+  client.get<Movie[]>(`/admin/sessions/${sessionId}/movies`).then((r) => r.data);
+
 export const deleteMovie = (movieId: number): Promise<void> =>
   client.delete(`/movies/${movieId}`).then(() => undefined);
 

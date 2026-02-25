@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import get_db, get_current_user
 from api.schemas.vote import MovieVoteResult, VoteRequest, VoteResponse, VoteResultsResponse
+from api.session_events import notify_session_changed
 from api.telegram_notify import notify_voting_finalized
 from api.database.models import Movie, Session, SessionStatus, User, Vote
 from api.database.status_manager import STATUS_RATING, STATUS_VOTING
@@ -250,10 +251,19 @@ async def finalize_votes(
                     winner_titles[slot] = m.title
         await notify_voting_finalized(winner_titles=winner_titles)
 
-    return {
+    response_data = {
         "winner_slot1_id": session.winner_slot1_id,
         "winner_slot2_id": session.winner_slot2_id,
         "runoff_slot1_ids": new_runoff[1],
         "runoff_slot2_ids": new_runoff[2],
         "status": result_status,
     }
+    await notify_session_changed({
+        "id": session.id,
+        "status": result_status,
+        "winner_slot1_id": session.winner_slot1_id,
+        "winner_slot2_id": session.winner_slot2_id,
+        "runoff_slot1_ids": new_runoff[1],
+        "runoff_slot2_ids": new_runoff[2],
+    })
+    return response_data
