@@ -22,7 +22,7 @@ services:
   bot:
     build:
       context: .
-      pull_policy: if_not_present
+    pull_policy: if_not_present
     depends_on:
       db:
         condition: service_healthy
@@ -41,7 +41,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
-      pull_policy: if_not_present
+    pull_policy: if_not_present
     depends_on:
       db:
         condition: service_healthy
@@ -58,7 +58,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.nginx
-      pull_policy: if_not_present
+    pull_policy: if_not_present
     ports:
       - "80:80"
       - "443:443"
