@@ -8,6 +8,9 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_DIR"
 
+# shellcheck source=scripts/lib.sh
+source "$SCRIPT_DIR/lib.sh"
+
 # ─── 1. git pull ──────────────────────────────────────────────────────────────
 
 echo "=== Получаем обновления ==="
@@ -16,8 +19,12 @@ git pull
 # ─── 2. Перезапуск контейнеров ────────────────────────────────────────────────
 
 echo ""
+# --no-pull: BuildKit использует локальный кеш и не обращается к Docker Hub,
+# обходя rate limit. Нужные образы уже загружены шагом ensure_base_images.
+ensure_base_images "$PROJECT_DIR"
+echo ""
 echo "=== Собираем образы ==="
-docker compose build --progress plain
+docker compose build --progress plain --no-pull
 
 echo ""
 echo "=== Запускаем контейнеры ==="

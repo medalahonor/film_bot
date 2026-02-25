@@ -94,7 +94,15 @@ fi
 echo ""
 echo "=== Запуск сервисов ==="
 cd "$PROJECT_DIR"
-docker compose up -d --build
+
+# shellcheck source=scripts/lib.sh
+source "$SCRIPT_DIR/lib.sh"
+
+# --no-pull: обход rate limit Docker Hub — BuildKit не обращается к реестру,
+# если образ уже есть локально. ensure_base_images загружает только недостающие.
+ensure_base_images "$PROJECT_DIR"
+docker compose build --no-pull
+docker compose up -d
 
 # ─── 5. Cron для авторенивала сертификата ─────────────────────────────────────
 

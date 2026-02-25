@@ -31,11 +31,11 @@ restart:
 
 # Пересборка nginx-образа (включает сборку React SPA внутри Docker)
 build-web:
-	docker compose build nginx
+	docker compose build --no-pull nginx
 
 # Пересборка docker-образов без запуска
 build:
-	docker compose build
+	docker compose build --no-pull
 
 # ── nginx ─────────────────────────────────────────────────────────────────────
 
