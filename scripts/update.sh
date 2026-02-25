@@ -19,12 +19,14 @@ git pull
 # ─── 2. Перезапуск контейнеров ────────────────────────────────────────────────
 
 echo ""
-# --no-pull: BuildKit использует локальный кеш и не обращается к Docker Hub,
-# обходя rate limit. Нужные образы уже загружены шагом ensure_base_images.
+# Загружаем базовые образы в локальный кеш (только при отсутствии).
+# DOCKER_BUILDKIT=0 переключает на классический builder: в отличие от BuildKit,
+# он не обращается к Docker Hub за манифестом образа (load metadata) и не вызывает
+# rate limit 429. Классический builder доступен в Docker 29 (deprecated, но не удалён).
 ensure_base_images "$PROJECT_DIR"
 echo ""
 echo "=== Собираем образы ==="
-docker compose build --progress plain --no-pull
+DOCKER_BUILDKIT=0 docker compose build --progress plain
 
 echo ""
 echo "=== Запускаем контейнеры ==="
