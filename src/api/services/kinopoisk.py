@@ -158,8 +158,8 @@ def _parse_graphql_response(data: Dict[str, Any], kinopoisk_id: str) -> Dict[str
     genre_names = [g["name"] for g in genres_list if g.get("name")]
     genres_str = ", ".join(genre_names) if genre_names else None
 
-    # Description (prefer shortDescription, fallback to synopsis)
-    description = film.get("shortDescription") or film.get("synopsis")
+    # Description (prefer synopsis, fallback to shortDescription)
+    description = film.get("synopsis") or film.get("shortDescription")
 
     # Poster URL
     gallery = film.get("gallery") or {}
@@ -281,7 +281,7 @@ def _parse_tvseries_graphql_response(data: Dict[str, Any], kinopoisk_id: str) ->
     genre_names = [g["name"] for g in genres_list if g.get("name")]
     genres_str = ", ".join(genre_names) if genre_names else None
 
-    description = tv.get("shortDescription") or tv.get("synopsis")
+    description = tv.get("synopsis") or tv.get("shortDescription")
 
     gallery = tv.get("gallery") or {}
     posters = gallery.get("posters") or {}

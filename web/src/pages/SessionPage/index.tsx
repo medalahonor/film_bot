@@ -4,6 +4,7 @@ import { createSession, changeSessionStatus } from '../../api/admin';
 import { finalizeVotes } from '../../api/votes';
 import { Loader } from '../../components/Loader';
 import { MovieCard } from '../../components/MovieCard';
+import { MovieCardFull } from '../../components/MovieCardFull';
 import type { Movie, SessionStatus } from '../../types';
 
 const STATUS_LABELS: Record<SessionStatus, string> = {
@@ -50,37 +51,61 @@ const StatusBadge: React.FC<{ status: SessionStatus }> = ({ status }) => (
 const SlotSection: React.FC<{ slot: number; movies: Movie[] }> = ({
   slot,
   movies,
-}) => (
-  <div>
-    <div
-      style={{
-        padding: '8px 16px 4px',
-        fontSize: 13,
-        fontWeight: 600,
-        color: 'var(--tg-theme-hint-color, #999)',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-      }}
-    >
-      Слот {slot}
-    </div>
-    {movies.map((movie) => (
-      <MovieCard key={movie.id} movie={movie} />
-    ))}
-    {movies.length === 0 && (
+}) => {
+  const [openMovie, setOpenMovie] = useState<Movie | null>(null);
+
+  return (
+    <div>
       <div
         style={{
-          padding: '12px 16px',
-          fontSize: 14,
+          padding: '8px 16px 4px',
+          fontSize: 13,
+          fontWeight: 600,
           color: 'var(--tg-theme-hint-color, #999)',
-          fontStyle: 'italic',
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
         }}
       >
-        Нет предложений
+        Слот {slot}
       </div>
-    )}
-  </div>
-);
+      {movies.map((movie) => (
+        <div key={movie.id}>
+          <MovieCard movie={movie} />
+          <button
+            onClick={() => setOpenMovie(movie)}
+            style={{
+              marginLeft: 88,
+              marginBottom: 8,
+              background: 'none',
+              border: 'none',
+              fontSize: 12,
+              color: 'var(--tg-theme-link-color, #2481cc)',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            Подробнее →
+          </button>
+        </div>
+      ))}
+      {movies.length === 0 && (
+        <div
+          style={{
+            padding: '12px 16px',
+            fontSize: 14,
+            color: 'var(--tg-theme-hint-color, #999)',
+            fontStyle: 'italic',
+          }}
+        >
+          Нет предложений
+        </div>
+      )}
+      {openMovie && (
+        <MovieCardFull movie={openMovie} onClose={() => setOpenMovie(null)} />
+      )}
+    </div>
+  );
+};
 
 const Divider: React.FC = () => (
   <div
