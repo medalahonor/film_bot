@@ -157,6 +157,7 @@ API использует `Depends(get_db)` из `api.dependencies`. Все query
 - Новые API-эндпоинты добавляются в соответствующий роутер в `src/api/routers/`, схемы — в `src/api/schemas/`.
 - Новые сервисы (внешние API, бизнес-логика) — в `src/api/services/`.
 - ORM-модели и query-функции — в `src/api/database/`.
+- **TypeScript nullable-типы.** Значение типа `T | null` или `T | undefined` нельзя использовать напрямую там, где ожидается non-nullable: вычисляемое имя свойства `[x]`, индекс массива, конкатенация строк. Добавлять null-guard (`if (x !== null)`) или non-null assertion (`x!`), если null гарантированно исключён логикой.
 
 ## Development Workflow
 
@@ -211,6 +212,7 @@ API использует `Depends(get_db)` из `api.dependencies`. Все query
 - [ ] Type hints расставлены на всех публичных функциях
 - [ ] Перекрёстные импорты хэндлеров отсутствуют
 - [ ] Если изменилась архитектура — обновлён раздел Architecture в CLAUDE.md (новые модули, изменения слоёв, новые паттерны доступа к БД)
+- [ ] Для TypeScript: nullable-типы (`T | null`, `T | undefined`) не используются без guard там, где тип должен быть non-nullable (computed property names, array indices)
 
 ---
 
@@ -226,6 +228,7 @@ API использует `Depends(get_db)` из `api.dependencies`. Все query
 - [ ] Нет дублирования кода, который уже есть в repositories/utils/formatters
 - [ ] Тесты написаны и покрывают заявленные сценарии
 - [ ] Нет потенциальных уязвимостей (SQL injection через raw query, необработанный пользовательский ввод)
+- [ ] В TypeScript-коде: nullable-типы не используются напрямую в computed property names и других позициях, требующих non-nullable
 - [ ] CLAUDE.md актуален, если архитектура изменилась
 
 ---

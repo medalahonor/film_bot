@@ -150,7 +150,7 @@ export const ProposePage: React.FC = () => {
         result = await proposeMovie({ session_id: currentSession.id, ...payload });
       }
       haptic?.notificationOccurred('success');
-      setMyMovies((prev) => ({ ...prev, [result.slot]: result }));
+      setMyMovies((prev) => ({ ...prev, [result.slot!]: result }));
       setSubmitSuccess(true);
     } catch (e) {
       setSubmitError(getErrorMessage(e));
