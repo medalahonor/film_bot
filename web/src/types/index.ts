@@ -20,6 +20,7 @@ export interface Movie {
   trailer_url: string | null;
   proposer_username: string | null;
   proposer_first_name: string | null;
+  proposer_last_name: string | null;
   proposer_telegram_id: number | null;
   created_at: string;
 }
@@ -120,12 +121,16 @@ export const formatYear = (year: number | null, yearEnd: number | null): string 
   return String(year);
 };
 
-/** Format proposer display name */
-export const formatProposer = (
-  username: string | null,
-  firstName: string | null,
+/** Format user display name. Priority: First+Last Name → @username → telegram_id → fallback. */
+export const formatUserName = (
+  firstName: string | null | undefined,
+  lastName: string | null | undefined,
+  username: string | null | undefined,
+  telegramId?: number | null,
 ): string => {
+  const parts = [firstName, lastName].filter(Boolean) as string[];
+  if (parts.length > 0) return parts.join(' ');
   if (username) return `@${username}`;
-  if (firstName) return firstName;
+  if (telegramId) return String(telegramId);
   return 'Участник';
 };

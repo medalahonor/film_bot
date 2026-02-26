@@ -28,7 +28,7 @@ import {
 } from '../../api/admin';
 import { finalizeVotes } from '../../api/votes';
 import type { Movie, Session, UserResponse, SuggestResult, MovieFull } from '../../types';
-import { formatYear } from '../../types';
+import { formatYear, formatUserName } from '../../types';
 import { UserAvatar } from '../../components/UserAvatar';
 import { useSuggest, useMovieDetail } from '../../hooks/useMovies';
 
@@ -927,7 +927,7 @@ const UsersTab: React.FC = () => {
               />
               <div>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>
-                  {u.username ? `@${u.username}` : u.first_name ?? '—'}
+                  {formatUserName(u.first_name, u.last_name, u.username, u.telegram_id)}
                 </span>
                 <span style={{ fontSize: 11, color: 'var(--tg-theme-hint-color)', marginLeft: 6 }}>
                   {u.telegram_id}

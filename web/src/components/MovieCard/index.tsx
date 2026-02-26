@@ -2,7 +2,7 @@ import React from 'react';
 import { Poster } from '../Poster';
 import { UserAvatar } from '../UserAvatar';
 import type { Movie, SuggestResult, MovieFull } from '../../types';
-import { formatYear, formatProposer } from '../../types';
+import { formatYear, formatUserName } from '../../types';
 
 type AnyMovie = Movie | SuggestResult | MovieFull;
 
@@ -95,6 +95,8 @@ export const MovieCard: React.FC<MovieCardProps> = ({
     'proposer_username' in movie ? movie.proposer_username : null;
   const proposerFirstName =
     'proposer_first_name' in movie ? movie.proposer_first_name : null;
+  const proposerLastName =
+    'proposer_last_name' in movie ? movie.proposer_last_name : null;
   const proposerTelegramId =
     'proposer_telegram_id' in movie ? movie.proposer_telegram_id : null;
 
@@ -151,7 +153,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({
 
         {/* Proposer + club rating */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
-          {(proposerUsername || proposerFirstName) && (
+          {(proposerFirstName || proposerLastName || proposerUsername || proposerTelegramId) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
               <UserAvatar
                 telegramId={proposerTelegramId}
@@ -160,7 +162,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({
                 size={18}
               />
               <span style={{ fontSize: 12, color: 'var(--tg-theme-hint-color, #999)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {formatProposer(proposerUsername, proposerFirstName)}
+                {formatUserName(proposerFirstName, proposerLastName, proposerUsername, proposerTelegramId)}
               </span>
             </div>
           )}

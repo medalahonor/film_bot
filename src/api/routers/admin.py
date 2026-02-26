@@ -50,12 +50,14 @@ async def allow_user(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(get_admin),
 ) -> dict:
+    from api.services.user_cache import invalidate
     result = await db.execute(select(User).where(User.telegram_id == telegram_id))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     user.is_allowed = True
     await db.commit()
+    invalidate(telegram_id)
     return {"telegram_id": telegram_id, "is_allowed": True}
 
 
@@ -65,12 +67,14 @@ async def block_user(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(get_admin),
 ) -> dict:
+    from api.services.user_cache import invalidate
     result = await db.execute(select(User).where(User.telegram_id == telegram_id))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     user.is_allowed = False
     await db.commit()
+    invalidate(telegram_id)
     return {"telegram_id": telegram_id, "is_allowed": False}
 
 
@@ -206,6 +210,7 @@ def _movie_to_response(movie: Movie) -> MovieResponse:
         trailer_url=getattr(movie, 'trailer_url', None),
         proposer_username=movie.proposer.username if movie.proposer else None,
         proposer_first_name=movie.proposer.first_name if movie.proposer else None,
+        proposer_last_name=movie.proposer.last_name if movie.proposer else None,
         proposer_telegram_id=movie.proposer.telegram_id if movie.proposer else None,
         created_at=movie.created_at,
     )

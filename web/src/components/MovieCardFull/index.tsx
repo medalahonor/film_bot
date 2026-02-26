@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Poster } from '../Poster';
 import { useTelegram } from '../../hooks/useTelegram';
 import type { Movie } from '../../types';
-import { formatYear, formatProposer } from '../../types';
+import { formatYear, formatUserName } from '../../types';
 
 interface MovieCardFullProps {
   movie: Movie;
@@ -105,7 +105,7 @@ export const MovieCardFull: React.FC<MovieCardFullProps> = ({
               </div>
 
               <div style={{ fontSize: 12, color: 'var(--tg-theme-hint-color, #999)', marginTop: 4 }}>
-                {formatProposer(movie.proposer_username, movie.proposer_first_name)}
+                {formatUserName(movie.proposer_first_name, movie.proposer_last_name, movie.proposer_username, movie.proposer_telegram_id)}
               </div>
             </div>
           </div>

@@ -57,6 +57,7 @@ class MovieResponse(BaseModel):
     trailer_url: Optional[str]
     proposer_username: Optional[str]
     proposer_first_name: Optional[str]
+    proposer_last_name: Optional[str]
     proposer_telegram_id: Optional[int]
     created_at: datetime
 
