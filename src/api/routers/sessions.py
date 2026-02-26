@@ -6,7 +6,7 @@ from typing import AsyncGenerator, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import delete as sql_delete, select
+from sqlalchemy import delete as sql_delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth import validate_init_data
@@ -221,6 +221,56 @@ async def change_session_status(
     ).scalar_one_or_none()
     if not new_status:
         raise HTTPException(status_code=422, detail=f"Unknown status: {new_status_code}")
+
+    current_order = _STATUS_ORDER.get(session.status, -1)
+    new_order = _STATUS_ORDER.get(new_status_code, -1)
+
+    # Guard 1: forward → voting requires at least one proposed movie
+    if new_status_code == STATUS_VOTING and new_order > current_order:
+        movie_count = (
+            await db.execute(
+                select(func.count(Movie.id)).where(Movie.session_id == session_id)
+            )
+        ).scalar() or 0
+        if movie_count == 0:
+            raise HTTPException(status_code=409, detail="Cannot start voting: no movies proposed")
+
+    # Guard 2: forward → rating requires winners for all slots that have movies
+    if new_status_code == STATUS_RATING and new_order > current_order:
+        slot1_count = (
+            await db.execute(
+                select(func.count(Movie.id))
+                .where(Movie.session_id == session_id, Movie.slot == 1)
+            )
+        ).scalar() or 0
+        slot2_count = (
+            await db.execute(
+                select(func.count(Movie.id))
+                .where(Movie.session_id == session_id, Movie.slot == 2)
+            )
+        ).scalar() or 0
+        missing = []
+        if slot1_count > 0 and not session.winner_slot1_id:
+            missing.append("slot 1")
+        if slot2_count > 0 and not session.winner_slot2_id:
+            missing.append("slot 2")
+        if missing:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot start rating: no winners for {', '.join(missing)}",
+            )
+
+    # Guard 3: → completed requires at least one vote cast
+    if new_status_code == STATUS_COMPLETED:
+        vote_count = (
+            await db.execute(
+                select(func.count(Vote.id)).where(Vote.session_id == session_id)
+            )
+        ).scalar() or 0
+        if vote_count == 0:
+            raise HTTPException(
+                status_code=409, detail="Cannot complete session: no votes cast"
+            )
 
     await _clear_rollback_data(db, session, new_status_code)
 
