@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class VoteResponse(BaseModel):
@@ -14,8 +14,8 @@ class VoteResponse(BaseModel):
 
 class VoteRequest(BaseModel):
     session_id: int
-    movie_ids: list[int]  # all selected movies in one slot (replaces previous votes)
-    slot: int
+    movie_ids: list[int] = Field(min_length=1)  # all selected movies in one slot (replaces previous votes)
+    slot: int = Field(ge=1, le=2)
 
 
 class MovieVoteResult(BaseModel):

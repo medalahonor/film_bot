@@ -24,6 +24,16 @@ router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 _STATUS_ORDER = {STATUS_COLLECTING: 0, STATUS_VOTING: 1, STATUS_RATING: 2, STATUS_COMPLETED: 3}
 
 
+def _parse_json_ids(raw: Optional[str]) -> Optional[list[int]]:
+    """Safely parse a JSON-encoded list of ints stored in a text column."""
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
 def _movie_to_response(movie: Movie) -> MovieResponse:
     return MovieResponse(
         id=movie.id,
@@ -57,8 +67,8 @@ def _session_to_response(session: Session) -> SessionResponse:
         completed_at=session.completed_at,
         winner_slot1_id=session.winner_slot1_id,
         winner_slot2_id=session.winner_slot2_id,
-        runoff_slot1_ids=json.loads(session.runoff_slot1_ids) if session.runoff_slot1_ids else None,
-        runoff_slot2_ids=json.loads(session.runoff_slot2_ids) if session.runoff_slot2_ids else None,
+        runoff_slot1_ids=_parse_json_ids(session.runoff_slot1_ids),
+        runoff_slot2_ids=_parse_json_ids(session.runoff_slot2_ids),
     )
 
 
@@ -258,18 +268,6 @@ async def change_session_status(
             raise HTTPException(
                 status_code=409,
                 detail=f"Cannot start rating: no winners for {', '.join(missing)}",
-            )
-
-    # Guard 3: → completed requires at least one vote cast
-    if new_status_code == STATUS_COMPLETED:
-        vote_count = (
-            await db.execute(
-                select(func.count(Vote.id)).where(Vote.session_id == session_id)
-            )
-        ).scalar() or 0
-        if vote_count == 0:
-            raise HTTPException(
-                status_code=409, detail="Cannot complete session: no votes cast"
             )
 
     await _clear_rollback_data(db, session, new_status_code)

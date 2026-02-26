@@ -64,10 +64,12 @@ async def submit_votes(
 
     # In runoff mode: restrict voting to only the runoff movie IDs for that slot
     runoff_ids: Optional[List[int]] = None
-    if body.slot == 1 and session.runoff_slot1_ids:
-        runoff_ids = json.loads(session.runoff_slot1_ids)
-    elif body.slot == 2 and session.runoff_slot2_ids:
-        runoff_ids = json.loads(session.runoff_slot2_ids)
+    raw_runoff = session.runoff_slot1_ids if body.slot == 1 else session.runoff_slot2_ids
+    if raw_runoff:
+        try:
+            runoff_ids = json.loads(raw_runoff)
+        except (json.JSONDecodeError, ValueError):
+            raise HTTPException(status_code=500, detail="Session runoff data is corrupted")
 
     if runoff_ids is not None:
         valid_movie_ids = set(runoff_ids)
@@ -182,7 +184,10 @@ async def finalize_votes(
         # Determine candidate movie IDs: runoff subset or full slot
         runoff_raw = session.runoff_slot1_ids if slot == 1 else session.runoff_slot2_ids
         if runoff_raw:
-            candidate_ids = json.loads(runoff_raw)
+            try:
+                candidate_ids = json.loads(runoff_raw)
+            except (json.JSONDecodeError, ValueError):
+                raise HTTPException(status_code=500, detail="Session runoff data is corrupted")
         else:
             candidate_ids = [
                 r[0] for r in (
