@@ -45,7 +45,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
       <div style={{ display: 'flex', gap: 4 }}>
         {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
           const filled = active !== null && n <= active;
-          const starColor = filled ? ratingColor(n) : 'var(--tg-theme-secondary-bg-color, #e0e0e0)';
+          const starColor = filled ? ratingColor(n) : 'var(--tg-theme-hint-color, #aaa)';
           return (
             <button
               key={n}
@@ -58,13 +58,18 @@ export const StarRating: React.FC<StarRatingProps> = ({
                 border: 'none',
                 cursor: readonly ? 'default' : 'pointer',
                 padding: 2,
-                lineHeight: 1,
-                fontSize: starSize,
-                color: starColor,
-                transition: 'color 0.1s',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 2,
               }}
             >
-              ★
+              <span style={{ fontSize: starSize, lineHeight: 1, color: starColor, transition: 'color 0.1s' }}>
+                ★
+              </span>
+              <span style={{ fontSize: 10, lineHeight: 1, color: starColor, transition: 'color 0.1s' }}>
+                {n}
+              </span>
             </button>
           );
         })}
