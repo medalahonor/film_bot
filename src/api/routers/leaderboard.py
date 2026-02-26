@@ -34,6 +34,7 @@ def _movie_to_response(movie: Movie) -> MovieResponse:
         trailer_url=getattr(movie, 'trailer_url', None),
         proposer_username=movie.proposer.username if movie.proposer else None,
         proposer_first_name=movie.proposer.first_name if movie.proposer else None,
+        proposer_last_name=movie.proposer.last_name if movie.proposer else None,
         proposer_telegram_id=movie.proposer.telegram_id if movie.proposer else None,
         created_at=movie.created_at,
     )
