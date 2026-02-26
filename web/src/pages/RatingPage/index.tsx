@@ -17,6 +17,7 @@ interface MovieRatingCardProps {
 const MovieRatingCard: React.FC<MovieRatingCardProps> = ({ movie, sessionId }) => {
   const { haptic } = useTelegram();
   const [rating, setRating] = useState<number | null>(null);
+  const [committedRating, setCommittedRating] = useState<number | null>(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +30,7 @@ const MovieRatingCard: React.FC<MovieRatingCardProps> = ({ movie, sessionId }) =
         const existing = ratings.find((r) => r.movie_id === movie.id);
         if (existing) {
           setRating(existing.rating);
+          setCommittedRating(existing.rating);
           setSaved(true);
         }
       })
@@ -36,6 +38,8 @@ const MovieRatingCard: React.FC<MovieRatingCardProps> = ({ movie, sessionId }) =
   }, [sessionId, movie.id]);
 
   const handleRate = async (value: number) => {
+    if (value === committedRating) return;
+
     setRating(value);
     setSaved(false);
     setSaving(true);
@@ -43,6 +47,7 @@ const MovieRatingCard: React.FC<MovieRatingCardProps> = ({ movie, sessionId }) =
     try {
       await submitRating({ session_id: sessionId, movie_id: movie.id, rating: value });
       setSaved(true);
+      setCommittedRating(value);
       haptic?.notificationOccurred('success');
     } catch (e) {
       setError(getErrorMessage(e));
@@ -85,6 +90,15 @@ const MovieRatingCard: React.FC<MovieRatingCardProps> = ({ movie, sessionId }) =
 
       {/* Stars */}
       <StarRating value={rating} onChange={handleRate} size="sm" />
+
+      {/* Club average */}
+      <div style={{ textAlign: 'center', marginTop: 6, fontSize: 13, color: 'var(--tg-theme-hint-color, #999)' }}>
+        Оценка клуба:{' '}
+        {movie.club_rating !== null
+          ? <span style={{ fontWeight: 700, color: 'var(--tg-theme-text-color, #222)' }}>{movie.club_rating.toFixed(1)}</span>
+          : <span>–</span>
+        }
+      </div>
 
       {/* Status */}
       <div style={{ textAlign: 'center', marginTop: 8, fontSize: 12, minHeight: 18 }}>

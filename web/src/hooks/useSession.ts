@@ -63,9 +63,29 @@ export const useSession = (): UseSessionResult => {
     const es = new EventSource(url);
     esRef.current = es;
 
-    es.onmessage = () => {
-      // Re-fetch full session + movies to get consistent state
-      refreshRef.current();
+    es.onmessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data) as {
+          type?: string;
+          movie_id?: number;
+          club_rating?: number | null;
+        };
+        if (data.type === 'rating_updated' && data.movie_id !== undefined) {
+          // Точечное обновление средней оценки — без полного рефреша и спиннера
+          setMovies((prev) =>
+            prev.map((m) =>
+              m.id === data.movie_id
+                ? { ...m, club_rating: data.club_rating ?? null }
+                : m
+            )
+          );
+        } else {
+          refreshRef.current();
+        }
+      } catch {
+        // Некорректный JSON (например, ping-комментарии SSE) — безопасный fallback
+        refreshRef.current();
+      }
     };
 
     es.onerror = () => {

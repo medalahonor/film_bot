@@ -2,7 +2,7 @@
 from decimal import Decimal
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +10,7 @@ from api.dependencies import get_db, get_current_user
 from api.schemas.rating import RatingRequest, RatingResponse
 from api.database.models import Movie, Rating, Session, SessionStatus, User
 from api.database.status_manager import STATUS_RATING
+from api.session_events import notify_session_changed
 
 router = APIRouter(prefix="/api/ratings", tags=["ratings"])
 
@@ -42,6 +43,7 @@ async def get_my_ratings(
 @router.post("", response_model=RatingResponse, status_code=201)
 async def submit_rating(
     body: RatingRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> RatingResponse:
@@ -67,6 +69,24 @@ async def submit_rating(
     movie = movie_result.scalar_one_or_none()
     if not movie or movie.session_id != body.session_id:
         raise HTTPException(status_code=404, detail="Movie not found in this session")
+
+    # No-op guard: if the user resubmits the same value, skip the write
+    existing_result = await db.execute(
+        select(Rating)
+        .where(Rating.session_id == body.session_id)
+        .where(Rating.movie_id == body.movie_id)
+        .where(Rating.user_id == user.id)
+    )
+    existing = existing_result.scalar_one_or_none()
+    if existing is not None and existing.rating == body.rating:
+        response.status_code = 200
+        return RatingResponse(
+            id=existing.id,
+            session_id=existing.session_id,
+            movie_id=existing.movie_id,
+            rating=existing.rating,
+            created_at=existing.created_at,
+        )
 
     # Upsert: delete old rating and insert new
     await db.execute(
@@ -94,6 +114,12 @@ async def submit_rating(
 
     await db.commit()
     await db.refresh(rating)
+
+    await notify_session_changed({
+        "type": "rating_updated",
+        "movie_id": body.movie_id,
+        "club_rating": float(movie.club_rating) if movie.club_rating is not None else None,
+    })
 
     return RatingResponse(
         id=rating.id,
