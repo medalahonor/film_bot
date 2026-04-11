@@ -5,8 +5,6 @@ import { useTelegram } from '../../hooks/useTelegram';
 import { MovieCard } from '../../components/MovieCard';
 import { MovieCardFull } from '../../components/MovieCardFull';
 import { Loader } from '../../components/Loader';
-import { finalizeVotes } from '../../api/votes';
-import { getErrorMessage } from '../../api/client';
 import type { Movie } from '../../types';
 
 interface SlotVotePanelProps {
@@ -152,8 +150,6 @@ const SlotVotePanel: React.FC<SlotVotePanelProps> = ({ slot, movies, sessionId, 
 export const VotePage: React.FC = () => {
   const { session, movies, loading, error, refresh } = useSession();
   const [activeSlot, setActiveSlot] = useState<1 | 2>(1);
-  const [finalizing, setFinalizing] = useState(false);
-  const [finalizeError, setFinalizeError] = useState<string | null>(null);
 
   const runoffIds1 = session?.runoff_slot1_ids ?? null;
   const runoffIds2 = session?.runoff_slot2_ids ?? null;
@@ -168,20 +164,6 @@ export const VotePage: React.FC = () => {
     const all = movies.filter((m) => m.slot === 2);
     return runoffIds2 ? all.filter((m) => runoffIds2.includes(m.id)) : all;
   }, [movies, runoffIds2]);
-
-  const handleFinalize = async () => {
-    if (!session) return;
-    setFinalizing(true);
-    setFinalizeError(null);
-    try {
-      await finalizeVotes(session.id);
-      refresh();
-    } catch (e) {
-      setFinalizeError(getErrorMessage(e));
-    } finally {
-      setFinalizing(false);
-    }
-  };
 
   if (loading) return <Loader center size={36} />;
 
@@ -264,30 +246,6 @@ export const VotePage: React.FC = () => {
         sessionId={session.id}
         isRunoff={activeSlot === 1 ? !!runoffIds1 : !!runoffIds2}
       />
-
-      {/* Finalize voting button */}
-      <div style={{ padding: '0 16px 24px' }}>
-        {finalizeError && (
-          <p style={{ color: '#e74c3c', fontSize: 13, marginBottom: 8 }}>{finalizeError}</p>
-        )}
-        <button
-          onClick={handleFinalize}
-          disabled={finalizing}
-          style={{
-            width: '100%',
-            padding: '13px 0',
-            backgroundColor: 'transparent',
-            color: finalizing ? 'var(--tg-theme-hint-color, #999)' : '#e74c3c',
-            border: '1px solid currentColor',
-            borderRadius: 10,
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: finalizing ? 'default' : 'pointer',
-          }}
-        >
-          {finalizing ? 'Подводим итоги...' : '🏁 Завершить голосование'}
-        </button>
-      </div>
     </div>
   );
 };

@@ -16,8 +16,8 @@ const STATUS_LABELS: Record<SessionStatus, string> = {
 
 const STATUS_NEXT_LABEL: Partial<Record<SessionStatus, string>> = {
   collecting: '→ Начать голосование',
-  voting: '→ Подвести итоги',
-  rating: '→ Завершить сессию',
+  voting: '→ Завершить голосование',
+  rating: '→ Завершить оценивание',
 };
 
 const STATUS_COLORS: Record<SessionStatus, string> = {
@@ -30,6 +30,20 @@ const STATUS_COLORS: Record<SessionStatus, string> = {
 const STATUS_NEXT: Partial<Record<SessionStatus, SessionStatus>> = {
   collecting: 'voting',
   rating: 'completed',
+};
+
+const CONFIRM_MESSAGES: Partial<Record<SessionStatus, string>> = {
+  collecting: 'Начать голосование? Предложение фильмов будет закрыто.',
+  voting: 'Завершить голосование и подвести итоги?',
+  rating: 'Завершить оценивание и подвести итоги сессии?',
+};
+
+const showConfirmDialog = (message: string): Promise<boolean> => {
+  const tg = window.Telegram?.WebApp;
+  if (tg?.initData && tg.showConfirm) {
+    return new Promise((resolve) => tg.showConfirm(message, resolve));
+  }
+  return Promise.resolve(window.confirm(message));
 };
 
 const StatusBadge: React.FC<{ status: SessionStatus }> = ({ status }) => (
@@ -124,6 +138,8 @@ export const SessionPage: React.FC = () => {
   const [advanceMsg, setAdvanceMsg] = useState<string | null>(null);
 
   const handleCreateSession = useCallback(async () => {
+    const confirmed = await showConfirmDialog('Начать новую сессию киноклуба?');
+    if (!confirmed) return;
     setCreating(true);
     try {
       await createSession();
@@ -135,6 +151,11 @@ export const SessionPage: React.FC = () => {
 
   const handleAdvance = useCallback(async () => {
     if (!session) return;
+    const message = CONFIRM_MESSAGES[session.status as SessionStatus];
+    if (message) {
+      const confirmed = await showConfirmDialog(message);
+      if (!confirmed) return;
+    }
     setAdvancing(true);
     setAdvanceMsg(null);
     try {

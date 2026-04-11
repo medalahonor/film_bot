@@ -43,6 +43,7 @@ services:
         condition: service_completed_successfully
     environment:
       DEV_MODE: ${DEV_MODE:-false}
+      WATCHFILES_FORCE_POLLING: "true"
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_ADMIN_IDS: ${TELEGRAM_ADMIN_IDS:-1}
       DATABASE_URL: postgresql+asyncpg://filmbot:${DB_PASSWORD}@db:5432/filmbot
@@ -64,6 +65,7 @@ services:
       - "127.0.0.1:5173:5173"
     environment:
       API_PROXY_TARGET: http://api:8000
+      DEV_MODE: "true"
     command: ["sh", "-c", "npm install && npm run dev -- --host"]
     depends_on:
       - api

@@ -5,7 +5,6 @@ import { StarRating } from '../../components/StarRating';
 import { MovieCardFull } from '../../components/MovieCardFull';
 import { Loader } from '../../components/Loader';
 import { submitRating, getMyRatings } from '../../api/ratings';
-import { changeSessionStatus } from '../../api/admin';
 import { getErrorMessage } from '../../api/client';
 import type { Movie } from '../../types';
 
@@ -119,22 +118,6 @@ const MovieRatingCard: React.FC<MovieRatingCardProps> = ({ movie, sessionId }) =
 
 export const RatingPage: React.FC = () => {
   const { session, movies, loading, error, refresh } = useSession();
-  const [completing, setCompleting] = useState(false);
-  const [completeError, setCompleteError] = useState<string | null>(null);
-
-  const handleComplete = async () => {
-    if (!session) return;
-    setCompleting(true);
-    setCompleteError(null);
-    try {
-      await changeSessionStatus(session.id, 'completed');
-      refresh();
-    } catch (e) {
-      setCompleteError(getErrorMessage(e));
-    } finally {
-      setCompleting(false);
-    }
-  };
 
   // Find winner movies
   const winnerMovies = useCallback((): Movie[] => {
@@ -214,30 +197,6 @@ export const RatingPage: React.FC = () => {
             <MovieRatingCard movie={movie} sessionId={session.id} />
           </div>
         ))}
-      </div>
-
-      {/* Complete session button */}
-      <div style={{ padding: '0 16px 24px' }}>
-        {completeError && (
-          <p style={{ color: '#e74c3c', fontSize: 13, marginBottom: 8 }}>{completeError}</p>
-        )}
-        <button
-          onClick={handleComplete}
-          disabled={completing}
-          style={{
-            width: '100%',
-            padding: '13px 0',
-            backgroundColor: 'transparent',
-            color: completing ? 'var(--tg-theme-hint-color, #999)' : '#e74c3c',
-            border: '1px solid currentColor',
-            borderRadius: 10,
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: completing ? 'default' : 'pointer',
-          }}
-        >
-          {completing ? 'Завершаем сессию...' : '🏁 Завершить оценивание'}
-        </button>
       </div>
     </div>
   );
