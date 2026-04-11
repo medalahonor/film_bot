@@ -57,9 +57,10 @@ export const useSession = (): UseSessionResult => {
   // SSE subscription for real-time session updates
   useEffect(() => {
     const initData = window.Telegram?.WebApp?.initData;
-    if (!initData) return;
-
-    const url = `/api/sessions/events?init_data=${encodeURIComponent(initData)}`;
+    if (!initData && !import.meta.env.DEV) return;
+    const url = initData
+      ? `/api/sessions/events?init_data=${encodeURIComponent(initData)}`
+      : `/api/sessions/events`;
     const es = new EventSource(url);
     esRef.current = es;
 

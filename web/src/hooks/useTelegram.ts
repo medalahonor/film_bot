@@ -96,8 +96,17 @@ export const useTelegramInit = () => {
     }
 
     getMe()
-      .then(({ is_admin }) => {
-        setIsAdmin(is_admin);
+      .then((me) => {
+        setIsAdmin(me.is_admin);
+        // Without Telegram SDK, populate user from API response
+        if (!user && me.telegram_id) {
+          setCurrentUser({
+            id: me.telegram_id,
+            first_name: me.first_name ?? 'User',
+            last_name: me.last_name ?? undefined,
+            username: me.username ?? undefined,
+          });
+        }
         setAuthLoading(false);
       })
       .catch(() => {

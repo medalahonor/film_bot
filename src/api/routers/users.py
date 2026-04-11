@@ -16,6 +16,9 @@ async def get_me(user: User = Depends(get_current_user)) -> dict:
     """Return current user's profile including admin status."""
     return {
         "telegram_id": user.telegram_id,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "username": user.username,
         "is_admin": user.telegram_id in config.telegram_admin_ids,
         "is_allowed": user.is_allowed,
     }

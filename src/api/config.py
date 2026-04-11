@@ -18,7 +18,8 @@ def _parse_group_topics(raw: str) -> dict[int, Optional[int]]:
 
 
 class Config:
-    telegram_bot_token: str = os.environ["TELEGRAM_BOT_TOKEN"]
+    dev_mode: bool = os.environ.get("DEV_MODE", "").lower() in ("1", "true", "yes")
+    telegram_bot_token: str = os.environ.get("TELEGRAM_BOT_TOKEN") or ""
     telegram_admin_ids: list[int] = [
         int(x) for x in os.environ.get("TELEGRAM_ADMIN_IDS", "").split(",") if x.strip()
     ]
@@ -31,3 +32,6 @@ class Config:
 
 
 config = Config()
+
+if not config.dev_mode and not config.telegram_bot_token:
+    raise RuntimeError("TELEGRAM_BOT_TOKEN is required when DEV_MODE is off")

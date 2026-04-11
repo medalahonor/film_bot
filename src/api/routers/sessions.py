@@ -140,7 +140,7 @@ async def get_current_session_movies(
 
 @router.get("/events")
 async def session_events(
-    init_data: str = Query(..., description="Telegram WebApp initData"),
+    init_data: str = Query("", description="Telegram WebApp initData"),
     db: AsyncSession = Depends(get_db),
 ) -> StreamingResponse:
     """SSE stream: pushes session-changed events to connected clients.

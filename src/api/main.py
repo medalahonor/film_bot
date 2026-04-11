@@ -24,6 +24,11 @@ logging.getLogger().addHandler(_mem_handler)
 
 app = FastAPI(title="FilmBot API", version="1.0.0")
 
+if config.dev_mode:
+    logging.getLogger(__name__).warning(
+        "DEV_MODE is ON — authentication is bypassed, all users auto-allowed"
+    )
+
 # Allow WebApp origin (and localhost for development)
 _origins = ["http://localhost:5173", "http://localhost:3000"]
 if config.webapp_origin:

@@ -56,14 +56,14 @@ async def get_current_user(
     - Auto-allows users listed in TELEGRAM_ADMIN_IDS.
     """
     telegram_id = int(tg_user["id"])
-    is_telegram_admin = telegram_id in config.telegram_admin_ids
+    should_auto_allow = telegram_id in config.telegram_admin_ids or config.dev_mode
 
     cached = get_cached(telegram_id)
     if cached is not None:
         if _profile_changed(cached, tg_user):
             await _update_profile(db, cached, tg_user)
             set_cached(cached)
-        if is_telegram_admin and not cached.is_allowed:
+        if should_auto_allow and not cached.is_allowed:
             cached.is_allowed = True
             await db.execute(
                 update(User)
@@ -86,7 +86,7 @@ async def get_current_user(
             username=tg_user.get("username"),
             first_name=tg_user.get("first_name"),
             last_name=tg_user.get("last_name"),
-            is_allowed=is_telegram_admin,
+            is_allowed=should_auto_allow,
         )
         db.add(user)
         await db.commit()
@@ -95,7 +95,7 @@ async def get_current_user(
         changed = _profile_changed(user, tg_user)
         if changed:
             await _update_profile(db, user, tg_user)
-        if is_telegram_admin and not user.is_allowed:
+        if should_auto_allow and not user.is_allowed:
             user.is_allowed = True
             await db.execute(
                 update(User)

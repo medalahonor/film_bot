@@ -1,5 +1,6 @@
 .PHONY: up down restart update logs status build clean \
-        setup build-web reload-nginx logs-nginx logs-api
+        setup build-web reload-nginx logs-nginx logs-api \
+        dev dev-down dev-logs dev-status
 
 # ── Первоначальный деплой ─────────────────────────────────────────────────────
 
@@ -60,6 +61,32 @@ logs-api:
 # Логи nginx
 logs-nginx:
 	docker compose logs -f nginx
+
+# ── Локальная разработка (DEV_MODE) ───────────────────────────────────────────
+
+DEV_COMPOSE = docker compose -f docker-compose.dev.yml --env-file .env.dev -p filmbot-dev
+
+# Запуск dev-окружения (db + api с hot-reload + web с Vite HMR)
+dev:
+	$(DEV_COMPOSE) up -d --build
+	@echo ""
+	@echo "  Dev environment is running:"
+	@echo "    Frontend: http://localhost:5173"
+	@echo "    API:      http://localhost:8000"
+	@echo "    API docs: http://localhost:8000/docs"
+	@echo ""
+
+# Остановка dev-окружения
+dev-down:
+	$(DEV_COMPOSE) down
+
+# Логи dev-окружения
+dev-logs:
+	$(DEV_COMPOSE) logs -f
+
+# Статус dev-контейнеров
+dev-status:
+	$(DEV_COMPOSE) ps
 
 # ── Статус и очистка ──────────────────────────────────────────────────────────
 
