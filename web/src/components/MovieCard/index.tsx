@@ -44,8 +44,8 @@ const KpRating: React.FC<{ rating: number | null }> = ({ rating }) => {
   return (
     <span
       style={{
-        fontSize: 13,
-        fontWeight: 700,
+        fontSize: 12,
+        fontWeight: 600,
         color,
         whiteSpace: 'nowrap',
       }}
@@ -59,12 +59,14 @@ const ClubRating: React.FC<{ rating: number | null | undefined }> = ({
   rating,
 }) => {
   if (!rating) return null;
+  const color =
+    rating >= 7 ? '#27ae60' : rating >= 5 ? '#95a5a6' : '#e74c3c';
   return (
     <span
       style={{
-        fontSize: 12,
-        fontWeight: 600,
-        color: 'var(--tg-theme-link-color, #2481cc)',
+        fontSize: 14,
+        fontWeight: 700,
+        color,
         whiteSpace: 'nowrap',
       }}
     >
@@ -122,10 +124,10 @@ export const MovieCard: React.FC<MovieCardProps> = ({
       <Poster src={posterUrl} alt={title} width={posterW} height={posterH} />
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {/* Type badge + KP rating row */}
+        {/* Type badge + Club rating row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
           <TypeBadge type={type} />
-          <KpRating rating={kpRating} />
+          <ClubRating rating={clubRating} />
         </div>
 
         {/* Title */}
@@ -151,7 +153,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({
           </div>
         )}
 
-        {/* Proposer + club rating */}
+        {/* Proposer + KP rating */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
           {(proposerFirstName || proposerLastName || proposerUsername || proposerTelegramId) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
@@ -166,7 +168,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({
               </span>
             </div>
           )}
-          <ClubRating rating={clubRating} />
+          <KpRating rating={kpRating} />
         </div>
       </div>
     </div>

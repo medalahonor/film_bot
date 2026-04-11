@@ -95,7 +95,7 @@ const MovieRatingCard: React.FC<MovieRatingCardProps> = ({ movie, sessionId }) =
       <div style={{ textAlign: 'center', marginTop: 6, fontSize: 13, color: 'var(--tg-theme-hint-color, #999)' }}>
         Оценка клуба:{' '}
         {movie.club_rating !== null
-          ? <span style={{ fontWeight: 700, color: 'var(--tg-theme-text-color, #222)' }}>{movie.club_rating.toFixed(1)}</span>
+          ? <span style={{ fontWeight: 700, color: movie.club_rating >= 7 ? '#27ae60' : movie.club_rating >= 5 ? '#95a5a6' : '#e74c3c' }}>{movie.club_rating.toFixed(1)}</span>
           : <span>–</span>
         }
       </div>

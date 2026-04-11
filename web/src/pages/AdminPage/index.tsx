@@ -479,7 +479,7 @@ const SessionOverlay: React.FC<SessionOverlayProps> = ({ session, onClose, onRel
                 <p style={{ margin: '0 0 6px', fontWeight: 600, fontSize: 13 }}>
                   {m.type === 'serial' ? '📺' : '🎬'} {m.title}
                   <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--tg-theme-hint-color)', marginLeft: 6 }}>
-                    КП {m.kinopoisk_rating ?? '—'}
+                    Клуб {m.club_rating ?? '—'} · КП {m.kinopoisk_rating ?? '—'}
                   </span>
                 </p>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -531,7 +531,7 @@ const SessionOverlay: React.FC<SessionOverlayProps> = ({ session, onClose, onRel
                 <p style={{ margin: 0, fontSize: 13 }}>
                   {m.type === 'serial' ? '📺' : '🎬'} {m.title}
                   <span style={{ color: 'var(--tg-theme-hint-color)', fontSize: 11, marginLeft: 6 }}>
-                    Слот {m.slot} · КП {m.kinopoisk_rating ?? '—'} · Клуб {m.club_rating ?? '—'}
+                    Слот {m.slot} · Клуб {m.club_rating ?? '—'} · КП {m.kinopoisk_rating ?? '—'}
                   </span>
                 </p>
               </div>
@@ -798,7 +798,7 @@ const MoviesTab: React.FC = () => {
               </p>
               <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--tg-theme-hint-color)' }}>
                 {m.session_id ? `Сессия #${m.session_id}` : '📚 Библиотека'}
-                {' · '}КП {m.kinopoisk_rating ?? '—'} · Клуб {m.club_rating ?? '—'}
+                {' · '}Клуб {m.club_rating ?? '—'} · КП {m.kinopoisk_rating ?? '—'}
               </p>
             </div>
             <button style={{ ...btnStyle(false, true), marginLeft: 8, flexShrink: 0 }} onClick={() => handleDelete(m.id)}>✕</button>

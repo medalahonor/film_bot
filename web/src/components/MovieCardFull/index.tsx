@@ -92,14 +92,14 @@ export const MovieCardFull: React.FC<MovieCardFullProps> = ({
 
               {/* Ratings row */}
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                {movie.kinopoisk_rating != null && (
-                  <span style={{ fontSize: 13, fontWeight: 700, color: movie.kinopoisk_rating >= 7 ? '#27ae60' : '#95a5a6' }}>
-                    КП {movie.kinopoisk_rating.toFixed(1)}
+                {movie.club_rating != null && (
+                  <span style={{ fontSize: 14, fontWeight: 700, color: movie.club_rating >= 7 ? '#27ae60' : movie.club_rating >= 5 ? '#95a5a6' : '#e74c3c' }}>
+                    ★ {movie.club_rating.toFixed(1)}
                   </span>
                 )}
-                {movie.club_rating != null && (
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--tg-theme-link-color, #2481cc)' }}>
-                    ★ {movie.club_rating.toFixed(1)}
+                {movie.kinopoisk_rating != null && (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: movie.kinopoisk_rating >= 7 ? '#27ae60' : '#95a5a6' }}>
+                    КП {movie.kinopoisk_rating.toFixed(1)}
                   </span>
                 )}
               </div>
