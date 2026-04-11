@@ -40,6 +40,44 @@ def _movie_to_response(movie: Movie) -> MovieResponse:
     )
 
 
+def _build_ranked_subquery(completed_session_ids_q) -> "Subquery":
+    """Подзапрос: все подходящие фильмы с ROW_NUMBER рангом."""
+    return (
+        select(
+            Movie.id.label("movie_id"),
+            func.row_number()
+            .over(order_by=(Movie.club_rating.desc(), Movie.id.asc()))
+            .label("rank"),
+        )
+        .where(Movie.session_id.in_(completed_session_ids_q))
+        .where(Movie.club_rating.is_not(None))
+        .subquery()
+    )
+
+
+async def _fetch_vote_rating_counts(
+    db: AsyncSession, movie_ids: list[int]
+) -> tuple[dict[int, int], dict[int, int]]:
+    """Возвращает (vote_counts, rating_counts) для списка movie_ids."""
+    vote_counts: dict[int, int] = {}
+    rating_counts: dict[int, int] = {}
+    if not movie_ids:
+        return vote_counts, rating_counts
+    vc = await db.execute(
+        select(Vote.movie_id, func.count(Vote.id))
+        .where(Vote.movie_id.in_(movie_ids))
+        .group_by(Vote.movie_id)
+    )
+    vote_counts = {row[0]: row[1] for row in vc}
+    rc = await db.execute(
+        select(Rating.movie_id, func.count(Rating.id))
+        .where(Rating.movie_id.in_(movie_ids))
+        .group_by(Rating.movie_id)
+    )
+    rating_counts = {row[0]: row[1] for row in rc}
+    return vote_counts, rating_counts
+
+
 @router.get("", response_model=LeaderboardResponse)
 async def get_leaderboard(
     page: int = Query(1, ge=1),
@@ -54,46 +92,32 @@ async def get_leaderboard(
         .where(SessionStatus.code == STATUS_COMPLETED)
     )
 
-    query = (
-        select(Movie)
-        .where(Movie.session_id.in_(completed_session_ids_q))
-        .where(Movie.club_rating.is_not(None))
+    ranked_sq = _build_ranked_subquery(completed_session_ids_q)
+    query = select(Movie, ranked_sq.c.rank).join(
+        ranked_sq, Movie.id == ranked_sq.c.movie_id
     )
-
     if search:
         query = query.where(Movie.title.ilike(f"%{search}%"))
 
-    total_q = select(func.count()).select_from(query.subquery())
-    total = (await db.execute(total_q)).scalar() or 0
+    total = (await db.execute(
+        select(func.count()).select_from(query.subquery())
+    )).scalar() or 0
     pages = max(1, math.ceil(total / per_page))
     offset = (page - 1) * per_page
 
-    movies = list(
-        (await db.execute(
-            query.order_by(Movie.club_rating.desc()).offset(offset).limit(per_page)
-        )).scalars().all()
-    )
+    rows = (await db.execute(
+        query.order_by(ranked_sq.c.rank).offset(offset).limit(per_page)
+    )).all()
 
-    # Count votes per movie
-    movie_ids = [m.id for m in movies]
-    vote_counts: dict[int, int] = {}
-    rating_counts: dict[int, int] = {}
-    if movie_ids:
-        vc = await db.execute(
-            select(Vote.movie_id, func.count(Vote.id))
-            .where(Vote.movie_id.in_(movie_ids))
-            .group_by(Vote.movie_id)
-        )
-        vote_counts = {row[0]: row[1] for row in vc}
-        rc = await db.execute(
-            select(Rating.movie_id, func.count(Rating.id))
-            .where(Rating.movie_id.in_(movie_ids))
-            .group_by(Rating.movie_id)
-        )
-        rating_counts = {row[0]: row[1] for row in rc}
+    movies = [row[0] for row in rows]
+    ranks = {row[0].id: row[1] for row in rows}
+    vote_counts, rating_counts = await _fetch_vote_rating_counts(
+        db, [m.id for m in movies]
+    )
 
     items = [
         LeaderboardEntry(
+            rank=ranks[m.id],
             movie=_movie_to_response(m),
             vote_count=vote_counts.get(m.id, 0),
             rating_count=rating_counts.get(m.id, 0),

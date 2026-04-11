@@ -6,6 +6,7 @@ from api.schemas.movie import MovieResponse
 
 
 class LeaderboardEntry(BaseModel):
+    rank: int
     movie: MovieResponse
     vote_count: int
     rating_count: int

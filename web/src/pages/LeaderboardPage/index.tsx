@@ -66,6 +66,13 @@ const StatsBar: React.FC<{ stats: ClubStats }> = ({ stats }) => (
   </div>
 );
 
+const getMedalColor = (rank: number): string | null => {
+  if (rank === 1) return '#f39c12';
+  if (rank === 2) return '#95a5a6';
+  if (rank === 3) return '#cd7f32';
+  return null;
+};
+
 export const LeaderboardPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -176,36 +183,44 @@ export const LeaderboardPage: React.FC = () => {
       )}
 
       {!loading &&
-        items.map(({ movie, vote_count, rating_count }, idx) => {
-          const globalIdx = idx + (page - 1) * 20;
+        items.map(({ rank, movie, vote_count, rating_count }) => {
+          const medalColor = getMedalColor(rank);
           return (
-          <div key={movie.id}>
+          <div
+            key={movie.id}
+            style={
+              medalColor
+                ? {
+                    border: `2px solid ${medalColor}`,
+                    borderRadius: 12,
+                    margin: '4px 8px',
+                  }
+                : undefined
+            }
+          >
             <div style={{ position: 'relative' }}>
               {/* Rank badge */}
               <div
                 style={{
                   position: 'absolute',
-                  top: 10,
-                  left: 4,
-                  width: 20,
-                  height: 20,
+                  top: 8,
+                  left: 2,
+                  minWidth: 22,
+                  height: 22,
+                  padding: '0 5px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 11,
                   fontWeight: 700,
-                  color:
-                    globalIdx === 0
-                      ? '#f39c12'
-                      : globalIdx === 1
-                        ? '#95a5a6'
-                        : globalIdx === 2
-                          ? '#cd7f32'
-                          : 'var(--tg-theme-hint-color, #999)',
+                  color: '#fff',
+                  backgroundColor: medalColor ?? 'rgba(0,0,0,0.45)',
+                  borderRadius: 11,
                   zIndex: 1,
+                  boxSizing: 'border-box',
                 }}
               >
-                {globalIdx + 1}
+                {rank}
               </div>
               <MovieCard movie={movie} />
             </div>
@@ -222,12 +237,14 @@ export const LeaderboardPage: React.FC = () => {
               {vote_count > 0 && <span>👍 {vote_count} голосов</span>}
               {rating_count > 0 && <span>⭐ {rating_count} оценок</span>}
             </div>
-            <div
-              style={{
-                height: 1,
-                backgroundColor: 'var(--tg-theme-secondary-bg-color, #f1f1f1)',
-              }}
-            />
+            {!medalColor && (
+              <div
+                style={{
+                  height: 1,
+                  backgroundColor: 'var(--tg-theme-secondary-bg-color, #f1f1f1)',
+                }}
+              />
+            )}
           </div>
           );
         })}

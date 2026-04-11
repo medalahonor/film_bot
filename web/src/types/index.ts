@@ -62,6 +62,7 @@ export interface MovieFull {
 }
 
 export interface LeaderboardEntry {
+  rank: number;
   movie: Movie;
   vote_count: number;
   rating_count: number;
