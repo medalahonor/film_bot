@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from api.auth import get_init_data_user
 from api.config import config
 from api.database.models import User
+from api.services.avatar_service import refresh_avatar_if_needed
 from api.services.user_cache import get_cached, invalidate, set_cached
 
 _engine = create_async_engine(config.database_url, pool_pre_ping=True)
@@ -74,6 +75,7 @@ async def get_current_user(
             set_cached(cached)
         if not cached.is_allowed:
             raise HTTPException(status_code=403, detail="Access denied")
+        await refresh_avatar_if_needed(db, cached)
         return cached
 
     # Cache miss — full DB lookup
@@ -107,6 +109,7 @@ async def get_current_user(
     if not user.is_allowed:
         raise HTTPException(status_code=403, detail="Access denied")
 
+    await refresh_avatar_if_needed(db, user)
     db.expunge(user)
     set_cached(user)
     return user

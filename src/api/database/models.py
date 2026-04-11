@@ -3,8 +3,8 @@ from datetime import datetime
 from typing import List, Optional
 
 from sqlalchemy import (
-    BigInteger, Boolean, String, Integer, Text, DateTime, ForeignKey,
-    UniqueConstraint, DECIMAL
+    BigInteger, Boolean, LargeBinary, String, Integer, Text, DateTime,
+    ForeignKey, UniqueConstraint, DECIMAL
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import text
@@ -41,6 +41,8 @@ class User(Base):
     first_name: Mapped[Optional[str]] = mapped_column(String(255))
     last_name: Mapped[Optional[str]] = mapped_column(String(255))
     is_allowed: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text('true'))
+    avatar: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    avatar_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships

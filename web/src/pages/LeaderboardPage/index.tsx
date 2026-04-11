@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { SearchBar } from '../../components/SearchBar';
 import { MovieCard } from '../../components/MovieCard';
+import { MovieCardFull } from '../../components/MovieCardFull';
+import { MovieRatingsList } from '../../components/MovieRatingsList';
 import { Loader } from '../../components/Loader';
 import { getLeaderboard, getClubStats } from '../../api/leaderboard';
 import { getErrorMessage } from '../../api/client';
-import type { LeaderboardEntry, ClubStats } from '../../types';
+import type { LeaderboardEntry, ClubStats, Movie } from '../../types';
 
 const useDebounce = (value: string, delay: number): string => {
   const [debounced, setDebounced] = useState(value);
@@ -82,6 +84,7 @@ export const LeaderboardPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -222,7 +225,7 @@ export const LeaderboardPage: React.FC = () => {
               >
                 {rank}
               </div>
-              <MovieCard movie={movie} />
+              <MovieCard movie={movie} onClick={() => setSelectedMovie(movie)} />
             </div>
             <div
               style={{
@@ -283,6 +286,14 @@ export const LeaderboardPage: React.FC = () => {
             Вперёд →
           </button>
         </div>
+      )}
+
+      {selectedMovie && (
+        <MovieCardFull
+          movie={selectedMovie}
+          onClose={() => setSelectedMovie(null)}
+          footer={<MovieRatingsList movieId={selectedMovie.id} />}
+        />
       )}
     </div>
   );

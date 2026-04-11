@@ -1,14 +1,22 @@
 """Users API routes."""
+import time
 from typing import Optional
 
-import aiohttp
 from fastapi import APIRouter, Depends, Response
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.config import config
-from api.dependencies import get_current_user
+from api.dependencies import get_current_user, get_db
 from api.database.models import User
+from api.services.avatar_service import fetch_avatar_from_telegram
 
 router = APIRouter(prefix="/api/users", tags=["users"])
+
+_AVATAR_CACHE_TTL = 600  # 10 minutes
+
+# {telegram_id: (bytes | None, monotonic_timestamp)}
+_avatar_cache: dict[int, tuple[Optional[bytes], float]] = {}
 
 
 @router.get("/me")
@@ -23,61 +31,85 @@ async def get_me(user: User = Depends(get_current_user)) -> dict:
         "is_allowed": user.is_allowed,
     }
 
-# Simple in-memory cache: {telegram_id: bytes | None}
-# None means "no photo"; refreshes on restart.
-_avatar_cache: dict[int, Optional[bytes]] = {}
+
+def _get_cached_avatar(telegram_id: int) -> tuple[bool, Optional[bytes]]:
+    """Check in-memory TTL cache. Returns (hit, data)."""
+    entry = _avatar_cache.get(telegram_id)
+    if entry is None:
+        return False, None
+    data, ts = entry
+    if time.monotonic() - ts > _AVATAR_CACHE_TTL:
+        del _avatar_cache[telegram_id]
+        return False, None
+    return True, data
+
+
+def _set_cached_avatar(telegram_id: int, data: Optional[bytes]) -> None:
+    _avatar_cache[telegram_id] = (data, time.monotonic())
+
+
+def _build_avatar_response(data: Optional[bytes]) -> Response:
+    if data is None:
+        return Response(status_code=404)
+    return Response(
+        content=data,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+async def _get_db_avatar(
+    db: AsyncSession, telegram_id: int,
+) -> tuple[bool, Optional[bytes]]:
+    """Read avatar bytes from DB. Returns (found_user, avatar_bytes)."""
+    result = await db.execute(
+        select(User.avatar).where(User.telegram_id == telegram_id)
+    )
+    row = result.one_or_none()
+    if row is None:
+        return False, None
+    return True, row[0]
+
+
+async def _fetch_and_store_avatar(
+    db: AsyncSession, telegram_id: int,
+) -> Optional[bytes]:
+    """Fetch avatar from Telegram API, store in DB, return bytes."""
+    from datetime import datetime
+
+    avatar_bytes = await fetch_avatar_from_telegram(telegram_id)
+    now = datetime.utcnow()
+    await db.execute(
+        update(User)
+        .where(User.telegram_id == telegram_id)
+        .values(avatar=avatar_bytes, avatar_updated_at=now)
+    )
+    await db.commit()
+    return avatar_bytes
 
 
 @router.get("/{telegram_id}/avatar")
-async def get_user_avatar(telegram_id: int) -> Response:
+async def get_user_avatar(
+    telegram_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
     """Proxy Telegram profile photo. Public endpoint — used in <img> src."""
-    if telegram_id in _avatar_cache:
-        data = _avatar_cache[telegram_id]
-        if data is None:
-            return Response(status_code=404)
-        return Response(
-            content=data,
-            media_type="image/jpeg",
-            headers={"Cache-Control": "public, max-age=3600"},
-        )
+    # Layer 1: in-memory cache
+    hit, data = _get_cached_avatar(telegram_id)
+    if hit:
+        return _build_avatar_response(data)
 
+    # Layer 2: DB
+    found, data = await _get_db_avatar(db, telegram_id)
+    if found and data is not None:
+        _set_cached_avatar(telegram_id, data)
+        return _build_avatar_response(data)
+
+    # Layer 3: Telegram API → store in DB
     try:
-        async with aiohttp.ClientSession() as session:
-            # Step 1: get file_id of the first profile photo
-            async with session.get(
-                f"https://api.telegram.org/bot{config.telegram_bot_token}/getUserProfilePhotos",
-                params={"user_id": telegram_id, "limit": 1},
-            ) as r1:
-                payload = await r1.json()
-
-            if not payload.get("ok") or not payload["result"]["photos"]:
-                _avatar_cache[telegram_id] = None
-                return Response(status_code=404)
-
-            # Use the smallest thumbnail to keep responses fast
-            file_id = payload["result"]["photos"][0][0]["file_id"]
-
-            # Step 2: resolve file path
-            async with session.get(
-                f"https://api.telegram.org/bot{config.telegram_bot_token}/getFile",
-                params={"file_id": file_id},
-            ) as r2:
-                file_payload = await r2.json()
-
-            file_path = file_payload["result"]["file_path"]
-
-            # Step 3: download the photo
-            async with session.get(
-                f"https://api.telegram.org/file/bot{config.telegram_bot_token}/{file_path}"
-            ) as r3:
-                photo_bytes = await r3.read()
-
-        _avatar_cache[telegram_id] = photo_bytes
-        return Response(
-            content=photo_bytes,
-            media_type="image/jpeg",
-            headers={"Cache-Control": "public, max-age=3600"},
-        )
+        data = await _fetch_and_store_avatar(db, telegram_id)
     except Exception:
-        _avatar_cache[telegram_id] = None
-        return Response(status_code=404)
+        data = None
+
+    _set_cached_avatar(telegram_id, data)
+    return _build_avatar_response(data)

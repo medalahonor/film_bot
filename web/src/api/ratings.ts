@@ -1,5 +1,5 @@
 import client from './client';
-import type { RatingResponse, OpenRatingsResponse } from '../types';
+import type { RatingResponse, RaterInfo, OpenRatingsResponse } from '../types';
 
 export interface RatingRequest {
   session_id: number;
@@ -17,3 +17,6 @@ export const getMyRatings = (sessionId: number): Promise<RatingResponse[]> =>
 
 export const getOpenRatings = (sessionId: number): Promise<OpenRatingsResponse> =>
   client.get<OpenRatingsResponse>(`/ratings/open/${sessionId}`).then((r) => r.data);
+
+export const getMovieRatings = (movieId: number): Promise<RaterInfo[]> =>
+  client.get<RaterInfo[]>(`/ratings/movie/${movieId}`).then((r) => r.data);

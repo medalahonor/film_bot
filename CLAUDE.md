@@ -88,6 +88,7 @@ Telegram user
 - **database/session.py** — async engine, sessionmaker (`AsyncSessionLocal`), `init_db()`. Читает `DATABASE_URL` из `api.config`.
 - **services/kinopoisk.py** — парсинг фильма через GraphQL API Кинопоиска (`graphql.kinopoisk.ru`): `parse_movie_data(url)`, `get_movie_by_id(id)`, `get_series_by_id(id)`, `suggest_search(query)`.
 - **services/_graphql_queries.py** — GraphQL-запросы для Кинопоиска (query allowlisting).
+- **services/avatar_service.py** — загрузка аватарок из Telegram Bot API (`fetch_avatar_from_telegram`), сохранение в БД (`refresh_avatar_if_needed`). Аватарки хранятся в `users.avatar` (LargeBinary), обновляются при заходе пользователя в WebApp.
 - **log_handler.py** — `InMemoryLogHandler` (deque на 200 записей), `get_recent_logs(n)` — для логов API-процесса, читается через `/api/admin/logs`.
 
 **Роутеры** (`/api/*`):
@@ -97,15 +98,15 @@ Telegram user
 | sessions.py | `/api/sessions` | CRUD сессий, переходы статусов (finalize-voting, start-runoff, finalize-runoff, rate) |
 | movies.py | `/api/movies` | Propose, replace, delete, update club_rating |
 | votes.py | `/api/votes` | Submit голосов, finalize, my votes |
-| ratings.py | `/api/ratings` | Submit рейтинга (upsert), пересчёт club_rating, my ratings |
+| ratings.py | `/api/ratings` | Submit рейтинга (upsert), пересчёт club_rating, my ratings, оценки фильма (movie/{id}) |
 | leaderboard.py | `/api/leaderboard` | Пагинированный топ по club_rating, поиск |
 | kinopoisk.py | `/api/kinopoisk` | suggest(query), movie(id), parse(url) |
-| users.py | `/api/users` | Proxy аватаров Telegram (in-memory cache) |
+| users.py | `/api/users` | Proxy аватаров Telegram (БД + in-memory TTL-кеш) |
 | admin.py | `/api/admin` | Управление users (allow/block), sessions, movies, просмотр логов |
 
 **Зависимости** (`dependencies.py`):
 - `get_db()` — AsyncSession из пула.
-- `get_current_user(db, tg_user)` — резолв Telegram user → DB User (создаёт с `is_allowed=False` если нет).
+- `get_current_user(db, tg_user)` — резолв Telegram user → DB User (создаёт с `is_allowed=False` если нет). Также обновляет аватарку через `refresh_avatar_if_needed` при первом заходе.
 - `get_admin(user)` — требует `telegram_id` в `ADMIN_IDS`.
 
 **Уведомления** (`telegram_notify.py`) — best-effort отправка в Telegram-группу из API (aiohttp, raw Bot API). Учитывает `topic_id` из конфига.
@@ -123,8 +124,8 @@ Telegram user
 ```
 web/src/
 ├── api/          # Axios-клиент + функции для каждого роутера API
-├── components/   # TabBar, MovieCard, MovieCardFull, Poster, SearchBar,
-│                 # StarRating, UserAvatar, Loader
+├── components/   # TabBar, MovieCard, MovieCardFull, MovieRatingsList, Poster,
+│                 # SearchBar, StarRating, UserAvatar, Loader
 ├── hooks/        # useTelegram, useSession, useMovies, useVoting
 ├── pages/        # SessionPage, ProposePage, VotePage, RatingPage,
 │                 # LeaderboardPage, AdminPage, AccessDeniedPage

@@ -187,3 +187,18 @@ async def get_open_ratings(
         for mid, raters in grouped.items()
     ]
     return OpenRatingsResponse(session_id=session_id, results=results)
+
+
+@router.get("/movie/{movie_id}", response_model=List[RaterInfo])
+async def get_movie_ratings(
+    movie_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> List[RaterInfo]:
+    """All ratings for a single movie, sorted by rating descending."""
+    result = await db.execute(
+        select(Rating)
+        .where(Rating.movie_id == movie_id)
+        .order_by(Rating.rating.desc(), Rating.created_at.asc())
+    )
+    return [_build_rater_info(r) for r in result.scalars().all()]
