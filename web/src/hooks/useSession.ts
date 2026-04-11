@@ -80,6 +80,9 @@ export const useSession = (): UseSessionResult => {
                 : m
             )
           );
+          window.dispatchEvent(new CustomEvent('filmbot:ratings-updated'));
+        } else if (data.type === 'votes_updated') {
+          window.dispatchEvent(new CustomEvent('filmbot:votes-updated'));
         } else {
           refreshRef.current();
         }

@@ -3,10 +3,11 @@ import { useSession } from '../../hooks/useSession';
 import { useTelegram } from '../../hooks/useTelegram';
 import { StarRating } from '../../components/StarRating';
 import { MovieCardFull } from '../../components/MovieCardFull';
+import { RatersList } from '../../components/RatersList';
 import { Loader } from '../../components/Loader';
-import { submitRating, getMyRatings } from '../../api/ratings';
+import { submitRating, getMyRatings, getOpenRatings } from '../../api/ratings';
 import { getErrorMessage } from '../../api/client';
-import type { Movie } from '../../types';
+import type { Movie, RaterInfo } from '../../types';
 
 interface MovieRatingCardProps {
   movie: Movie;
@@ -21,6 +22,16 @@ const MovieRatingCard: React.FC<MovieRatingCardProps> = ({ movie, sessionId }) =
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showFull, setShowFull] = useState(false);
+  const [raters, setRaters] = useState<RaterInfo[]>([]);
+
+  const fetchRaters = useCallback(() => {
+    getOpenRatings(sessionId)
+      .then((r) => {
+        const movieRatings = r.results.find((mr) => mr.movie_id === movie.id);
+        setRaters(movieRatings?.raters ?? []);
+      })
+      .catch(() => {});
+  }, [sessionId, movie.id]);
 
   // Load existing rating
   useEffect(() => {
@@ -36,6 +47,14 @@ const MovieRatingCard: React.FC<MovieRatingCardProps> = ({ movie, sessionId }) =
       .catch(() => {});
   }, [sessionId, movie.id]);
 
+  // Load open ratings + listen for SSE updates
+  useEffect(() => {
+    fetchRaters();
+    const handler = () => fetchRaters();
+    window.addEventListener('filmbot:ratings-updated', handler);
+    return () => window.removeEventListener('filmbot:ratings-updated', handler);
+  }, [fetchRaters]);
+
   const handleRate = async (value: number) => {
     if (value === committedRating) return;
 
@@ -47,6 +66,7 @@ const MovieRatingCard: React.FC<MovieRatingCardProps> = ({ movie, sessionId }) =
       await submitRating({ session_id: sessionId, movie_id: movie.id, rating: value });
       setSaved(true);
       setCommittedRating(value);
+      fetchRaters();
       haptic?.notificationOccurred('success');
     } catch (e) {
       setError(getErrorMessage(e));
@@ -98,6 +118,9 @@ const MovieRatingCard: React.FC<MovieRatingCardProps> = ({ movie, sessionId }) =
           : <span>–</span>
         }
       </div>
+
+      {/* Open ratings list */}
+      <RatersList raters={raters} />
 
       {/* Status */}
       <div style={{ textAlign: 'center', marginTop: 8, fontSize: 12, minHeight: 18 }}>

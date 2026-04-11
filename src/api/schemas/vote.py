@@ -18,9 +18,17 @@ class VoteRequest(BaseModel):
     slot: int = Field(ge=1, le=2)
 
 
+class VoterInfo(BaseModel):
+    telegram_id: int
+    first_name: str | None
+    last_name: str | None
+    username: str | None
+
+
 class MovieVoteResult(BaseModel):
     movie_id: int
     vote_count: int
+    voters: list[VoterInfo]
 
 
 class VoteResultsResponse(BaseModel):

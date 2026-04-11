@@ -1,11 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSession } from '../../hooks/useSession';
 import { useVoting } from '../../hooks/useVoting';
 import { useTelegram } from '../../hooks/useTelegram';
 import { MovieCard } from '../../components/MovieCard';
 import { MovieCardFull } from '../../components/MovieCardFull';
+import { VotersList } from '../../components/VotersList';
 import { Loader } from '../../components/Loader';
-import type { Movie } from '../../types';
+import { getVoteResults } from '../../api/votes';
+import type { Movie, MovieVoteResult } from '../../types';
 
 interface SlotVotePanelProps {
   slot: number;
@@ -22,6 +24,18 @@ const SlotVotePanel: React.FC<SlotVotePanelProps> = ({ slot, movies, sessionId, 
   );
   const { haptic } = useTelegram();
   const [openMovie, setOpenMovie] = useState<Movie | null>(null);
+  const [voteResults, setVoteResults] = useState<MovieVoteResult[]>([]);
+
+  const fetchVoteResults = useCallback(() => {
+    getVoteResults(sessionId).then((r) => setVoteResults(r.results)).catch(() => {});
+  }, [sessionId]);
+
+  useEffect(() => {
+    fetchVoteResults();
+    const handler = () => fetchVoteResults();
+    window.addEventListener('filmbot:votes-updated', handler);
+    return () => window.removeEventListener('filmbot:votes-updated', handler);
+  }, [fetchVoteResults]);
 
   const handleToggle = (movie: Movie) => {
     toggle(movie.id);
@@ -30,6 +44,7 @@ const SlotVotePanel: React.FC<SlotVotePanelProps> = ({ slot, movies, sessionId, 
 
   const handleSubmit = async () => {
     await submit();
+    fetchVoteResults();
     haptic?.notificationOccurred(submitted ? 'success' : 'warning');
   };
 
@@ -75,7 +90,7 @@ const SlotVotePanel: React.FC<SlotVotePanelProps> = ({ slot, movies, sessionId, 
           <button
             onClick={() => setOpenMovie(movie)}
             style={{
-              marginLeft: 88, marginBottom: 8,
+              marginLeft: 88, marginBottom: 4,
               background: 'none', border: 'none',
               fontSize: 12, color: 'var(--tg-theme-link-color, #2481cc)',
               cursor: 'pointer', padding: 0,
@@ -83,6 +98,7 @@ const SlotVotePanel: React.FC<SlotVotePanelProps> = ({ slot, movies, sessionId, 
           >
             Подробнее →
           </button>
+          <VotersList voters={voteResults.find((r) => r.movie_id === movie.id)?.voters ?? []} />
         </div>
       ))}
 

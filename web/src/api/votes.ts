@@ -1,5 +1,5 @@
 import client from './client';
-import type { VoteResponse } from '../types';
+import type { VoteResponse, VoteResultsResponse } from '../types';
 
 export interface VoteRequest {
   session_id: number;
@@ -22,6 +22,9 @@ export const getMyVotes = (sessionId: number): Promise<VoteResponse[]> =>
   client
     .get<VoteResponse[]>('/votes/my', { params: { session_id: sessionId } })
     .then((r) => r.data);
+
+export const getVoteResults = (sessionId: number): Promise<VoteResultsResponse> =>
+  client.get<VoteResultsResponse>(`/votes/results/${sessionId}`).then((r) => r.data);
 
 export const finalizeVotes = (sessionId: number): Promise<FinalizeResult> =>
   client.post<FinalizeResult>(`/votes/finalize/${sessionId}`).then((r) => r.data);

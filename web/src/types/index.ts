@@ -106,6 +106,44 @@ export interface UserResponse {
   created_at: string;
 }
 
+export interface VoterInfo {
+  telegram_id: number;
+  first_name: string | null;
+  last_name: string | null;
+  username: string | null;
+}
+
+export interface MovieVoteResult {
+  movie_id: number;
+  vote_count: number;
+  voters: VoterInfo[];
+}
+
+export interface VoteResultsResponse {
+  session_id: number;
+  results: MovieVoteResult[];
+}
+
+export interface RaterInfo {
+  telegram_id: number;
+  first_name: string | null;
+  last_name: string | null;
+  username: string | null;
+  rating: number;
+  created_at: string;
+}
+
+export interface OpenMovieRatings {
+  movie_id: number;
+  club_rating: number | null;
+  raters: RaterInfo[];
+}
+
+export interface OpenRatingsResponse {
+  session_id: number;
+  results: OpenMovieRatings[];
+}
+
 export interface TelegramUser {
   id: number;
   first_name: string;

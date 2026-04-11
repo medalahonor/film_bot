@@ -1,5 +1,5 @@
 import client from './client';
-import type { RatingResponse } from '../types';
+import type { RatingResponse, OpenRatingsResponse } from '../types';
 
 export interface RatingRequest {
   session_id: number;
@@ -14,3 +14,6 @@ export const getMyRatings = (sessionId: number): Promise<RatingResponse[]> =>
   client
     .get<RatingResponse[]>('/ratings/my', { params: { session_id: sessionId } })
     .then((r) => r.data);
+
+export const getOpenRatings = (sessionId: number): Promise<OpenRatingsResponse> =>
+  client.get<OpenRatingsResponse>(`/ratings/open/${sessionId}`).then((r) => r.data);

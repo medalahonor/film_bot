@@ -7,7 +7,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import get_db, get_current_user
-from api.schemas.vote import MovieVoteResult, VoteRequest, VoteResponse, VoteResultsResponse
+from api.schemas.vote import MovieVoteResult, VoterInfo, VoteRequest, VoteResponse, VoteResultsResponse
 from api.session_events import notify_session_changed
 from api.telegram_notify import notify_voting_finalized
 from api.database.models import Movie, Session, SessionStatus, User, Vote
@@ -105,10 +105,21 @@ async def submit_votes(
     for v in new_votes:
         await db.refresh(v)
 
+    await notify_session_changed({"type": "votes_updated", "session_id": body.session_id})
+
     return [
         VoteResponse(id=v.id, session_id=v.session_id, movie_id=v.movie_id, created_at=v.created_at)
         for v in new_votes
     ]
+
+
+def _build_voter_info(user: User) -> VoterInfo:
+    return VoterInfo(
+        telegram_id=user.telegram_id,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        username=user.username,
+    )
 
 
 @router.get("/results/{session_id}", response_model=VoteResultsResponse)
@@ -117,14 +128,23 @@ async def get_vote_results(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> VoteResultsResponse:
-    """Aggregated vote counts per movie for a session."""
-    rows = await db.execute(
-        select(Vote.movie_id, func.count(Vote.id).label("cnt"))
+    """Vote counts per movie with voter details for a session."""
+    result = await db.execute(
+        select(Vote)
         .where(Vote.session_id == session_id)
-        .group_by(Vote.movie_id)
-        .order_by(func.count(Vote.id).desc())
+        .order_by(Vote.movie_id)
     )
-    results = [MovieVoteResult(movie_id=row[0], vote_count=row[1]) for row in rows]
+    votes = list(result.scalars().all())
+
+    grouped: dict[int, list[VoterInfo]] = {}
+    for vote in votes:
+        grouped.setdefault(vote.movie_id, []).append(_build_voter_info(vote.user))
+
+    results = [
+        MovieVoteResult(movie_id=mid, vote_count=len(voters), voters=voters)
+        for mid, voters in grouped.items()
+    ]
+    results.sort(key=lambda r: r.vote_count, reverse=True)
     return VoteResultsResponse(session_id=session_id, results=results)
 
 

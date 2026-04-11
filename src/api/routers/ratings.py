@@ -7,7 +7,13 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import get_db, get_current_user
-from api.schemas.rating import RatingRequest, RatingResponse
+from api.schemas.rating import (
+    OpenMovieRatings,
+    OpenRatingsResponse,
+    RaterInfo,
+    RatingRequest,
+    RatingResponse,
+)
 from api.database.models import Movie, Rating, Session, SessionStatus, User
 from api.database.status_manager import STATUS_RATING
 from api.session_events import notify_session_changed
@@ -128,3 +134,56 @@ async def submit_rating(
         rating=rating.rating,
         created_at=rating.created_at,
     )
+
+
+def _build_rater_info(rating_obj: Rating) -> RaterInfo:
+    user = rating_obj.user
+    return RaterInfo(
+        telegram_id=user.telegram_id,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        username=user.username,
+        rating=rating_obj.rating,
+        created_at=rating_obj.created_at,
+    )
+
+
+@router.get("/open/{session_id}", response_model=OpenRatingsResponse)
+async def get_open_ratings(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> OpenRatingsResponse:
+    """All ratings per movie with rater details, sorted by created_at desc."""
+    result = await db.execute(
+        select(Rating)
+        .where(Rating.session_id == session_id)
+        .order_by(Rating.movie_id, Rating.created_at.desc())
+    )
+    ratings_list = list(result.scalars().all())
+
+    grouped: dict[int, list[RaterInfo]] = {}
+    for r in ratings_list:
+        grouped.setdefault(r.movie_id, []).append(_build_rater_info(r))
+
+    # Get club_rating from movies
+    movie_ids = list(grouped.keys())
+    club_ratings: dict[int, float | None] = {}
+    if movie_ids:
+        movie_rows = await db.execute(
+            select(Movie.id, Movie.club_rating).where(Movie.id.in_(movie_ids))
+        )
+        club_ratings = {
+            row[0]: float(row[1]) if row[1] is not None else None
+            for row in movie_rows
+        }
+
+    results = [
+        OpenMovieRatings(
+            movie_id=mid,
+            club_rating=club_ratings.get(mid),
+            raters=raters,
+        )
+        for mid, raters in grouped.items()
+    ]
+    return OpenRatingsResponse(session_id=session_id, results=results)
